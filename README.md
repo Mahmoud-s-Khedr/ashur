@@ -60,11 +60,14 @@ pnpm typecheck
 pnpm test         # scoring, engine, full 48-team tournament, import and timer tests
 pnpm build
 pnpm sim          # real WS clients; all stages, reconnect, crash, load and exports
+pnpm e2e          # full manual/auto tournaments, faults, backup restore, admin + four team browsers
 pnpm smoke        # Chromium admin/play/display checks
 pnpm tour         # plays a whole tournament with bots and saves screenshots to ./tour-shots (TOUR_LANG=en for English)
 ```
 
 Browser checks use `/usr/bin/chromium` if installed. Otherwise run `pnpm exec playwright install chromium`, or set `CHROMIUM_PATH` to your browser executable. Browser tests and the simulator use separate temporary databases and test-only PINs. Build before `sim` or `smoke`. Production assets never depend on Vite.
+
+Build before `e2e` too. It creates disposable servers/databases, asserts every round's scores and qualifications in two full 48-team tournaments, then exercises operational failures, simultaneous final finishes, the Linux supervisor and all three stages through four independent team browsers, an admin and a projector. It writes a JSON report, exports and screenshots to a printed temporary directory; set `E2E_OUT=test-results/e2e` to retain evidence in the workspace. To investigate a subset, use `E2E_ONLY=tournaments`, `operations`, `faults`, `supervisor`, `arbitration` or `browser`. Printing checks verify generated content with the native print dialog stubbed; projector audio checks verify browser activation, not physical speakers. Actual venue networking and hardware still require the rehearsal checklist.
 
 The simulator's arrival-spread measurements use local loopback. They do **not** establish LAN timing. There is no physically achievable zero-latency guarantee: measure the actual router and computers during rehearsal. The target from the plan is under 5 ms spread.
 

@@ -74,7 +74,15 @@ test('Arabic admin, team and display screens work without external runtime reque
   await play.setViewportSize({ width: 390, height: 844 });
   await expect(play.locator('.options .opt').first()).toBeVisible();
   await play.bringToFront(); // background tabs freeze CSS animations
-  await play.waitForTimeout(700);
+  await expect
+    .poll(() =>
+      play
+        .locator('.p-question')
+        .evaluate((el) =>
+          el.getAnimations().every((animation) => animation.playState === 'finished'),
+        ),
+    )
+    .toBe(true);
   const offenders = await play.evaluate(() =>
     [...document.querySelectorAll('body *')]
       .filter(

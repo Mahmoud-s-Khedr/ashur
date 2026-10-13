@@ -1,4 +1,4 @@
-import { beforeEach, afterEach, describe, it, expect } from 'vitest';
+import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import { openDb } from './db';
 import { seed } from './seed';
 import { Engine } from './engine';
@@ -26,7 +26,10 @@ beforeEach(() => {
   seed(db);
   engine = new Engine(db, () => clock);
 });
-afterEach(() => db.close());
+afterEach(() => {
+  db.close();
+  vi.useRealTimers();
+});
 describe('M0 foundation', () => {
   it('seeds exactly 48 teams and 180 questions', () => {
     expect(engine.teams()).toHaveLength(48);
@@ -166,6 +169,97 @@ describe('M2 admin tools', () => {
     expect(engine.state.phase).toBe('RUNNING');
     expect(engine.question(qId)?.used).toBe(true);
   });
+  it('preserves a paused Blitz clock when replacing a leaked question', () => {
+    vi.useFakeTimers();
+    start();
+    const qId = engine.state.set[0];
+    clock = 10000;
+    vi.advanceTimersByTime(10000);
+    engine.dispatch('round.pause', {}, admin);
+    const remaining = engine.state.remainingMs;
+    clock = 70000;
+    vi.advanceTimersByTime(60000);
+    engine.dispatch('question.cancelLeak', { questionId: qId }, admin);
+    expect(engine.state.paused).toBe(true);
+    expect(engine.elapsed()).toBe(10000);
+    expect(engine.state.remainingMs).toBe(remaining);
+    expect(() =>
+      engine.dispatch(
+        'answer.submit',
+        { roundQuestionId: engine.state.set[0], answer: 0 },
+        team(1),
+      ),
+    ).toThrow('paused');
+    engine.dispatch('round.resume', {}, admin);
+    expect(engine.state.endsAt).toBe(Date.now() + remaining);
+    clock = 71000;
+    vi.advanceTimersByTime(1000);
+    expect(engine.elapsed()).toBe(11000);
+    for (const q of engine.state.set)
+      engine.dispatch('answer.submit', { roundQuestionId: q, answer: 0 }, team(1));
+    expect(engine.state.finishMs[1]).toBe(11000);
+    expect(engine.snapshot(team(1)).ownBonus).toBe(15);
+    vi.advanceTimersByTime(remaining - 1000);
+    engine.dispatch('system.tick', {}, { role: 'system', deviceId: 'timer' });
+    expect(engine.state.phase).toBe('RESULTS');
+  });
+  it.each(['REVIEW', 'TIE_READY', 'TIE_RUNNING', 'TIE_REVIEW'] as const)(
+    'recalculates qualification after a score correction in %s',
+    (phase) => {
+      start();
+      engine.state.endsAt = Date.now() - 1;
+      engine.dispatch('system.tick', {}, { role: 'system', deviceId: 'timer' });
+      if (phase !== 'REVIEW') engine.dispatch('tiebreak.open', {}, admin);
+      if (phase === 'TIE_RUNNING' || phase === 'TIE_REVIEW') {
+        for (let id = 1; id <= 4; id++) engine.dispatch('team.ready', {}, team(id));
+        engine.dispatch('tiebreak.launch', {}, admin);
+      }
+      if (phase === 'TIE_REVIEW') {
+        engine.state.endsAt = Date.now() - 1;
+        engine.dispatch('system.tick', {}, { role: 'system', deviceId: 'timer' });
+      }
+      expect(engine.state.phase).toBe(phase);
+      engine.dispatch('score.adjust', { teamId: 1, delta: 5, reason: 'Correction' }, admin);
+      expect(engine.state.phase).toBe('RESULTS');
+      expect(engine.state.winner).toBe(1);
+      expect(engine.state.tieIds).toEqual([]);
+      expect(engine.state.tieQuestion).toBeUndefined();
+      expect(engine.state.autoAt).toBe(0);
+      expect(engine.round.completed).toBe(true);
+      expect(engine.state.rounds.find((r) => r.key === '2-1')!.teamIds).toEqual([1]);
+    },
+  );
+  it('restarts tie readiness with the corrected leaders', () => {
+    start();
+    engine.state.endsAt = Date.now() - 1;
+    engine.dispatch('system.tick', {}, { role: 'system', deviceId: 'timer' });
+    engine.dispatch('tiebreak.open', {}, admin);
+    for (let id = 1; id <= 4; id++) engine.dispatch('team.ready', {}, team(id));
+    engine.dispatch('tiebreak.launch', {}, admin);
+    engine.dispatch('score.adjust', { teamId: 4, delta: -5, reason: 'Penalty' }, admin);
+    expect(engine.state.phase).toBe('REVIEW');
+    expect(engine.state.tieIds).toEqual([1, 2, 3]);
+    expect(engine.state.tieQuestion).toBeUndefined();
+    expect(engine.state.ready).toEqual([]);
+    expect(engine.state.endsAt).toBe(0);
+    engine.dispatch('tiebreak.open', {}, admin);
+    expect(() => engine.dispatch('team.ready', {}, team(4))).toThrow('Not in lineup');
+    engine.dispatch('undo.last', {}, admin);
+    expect(engine.state.phase).toBe('REVIEW');
+    expect(engine.state.tieIds).toEqual([1, 2, 3, 4]);
+  });
+  it('recalculates qualification after undoing a manual adjustment', () => {
+    engine.dispatch('score.adjust', { teamId: 1, delta: 5, reason: 'Correction' }, admin);
+    engine.dispatch('score.adjust', { teamId: 2, delta: 5, reason: 'Correction' }, admin);
+    start();
+    engine.state.endsAt = Date.now() - 1;
+    engine.dispatch('system.tick', {}, { role: 'system', deviceId: 'timer' });
+    expect(engine.state.tieIds).toEqual([1, 2]);
+    engine.dispatch('undo.last', {}, admin);
+    expect(engine.state.phase).toBe('RESULTS');
+    expect(engine.state.winner).toBe(1);
+    expect(engine.scores()[2]).toBe(0);
+  });
   it('binds one device per team, releases only on admin kick', () => {
     for (const id of ['device-a', 'device-b'])
       db.prepare('INSERT INTO devices(id,role,token_hash) VALUES(?,?,?)').run(id, 'team', id);
@@ -181,6 +275,26 @@ describe('M2 admin tools', () => {
   });
 });
 describe('M3 Gambler', () => {
+  it('keeps a paused replacement question paused with a fresh timer', () => {
+    start('2-1');
+    engine.dispatch('wheel.spin', {}, admin);
+    for (let id = 1; id <= 4; id++) engine.dispatch('card.select', { value: 5 }, team(id));
+    engine.dispatch('question.start', {}, admin);
+    const qId = engine.state.set[0];
+    clock = 10000;
+    engine.dispatch('round.pause', {}, admin);
+    clock = 70000;
+    engine.dispatch('question.cancelLeak', {}, admin);
+    expect(engine.state.set[0]).not.toBe(qId);
+    expect(engine.state.paused).toBe(true);
+    expect(engine.elapsed()).toBe(0);
+    expect(engine.state.remainingMs).toBe(engine.state.settings.questionMs);
+    expect(engine.state.cards).toEqual({ 1: 5, 2: 5, 3: 5, 4: 5 });
+    engine.dispatch('round.resume', {}, admin);
+    expect(engine.state.endsAt).toBe(Date.now() + engine.state.settings.questionMs);
+    clock = 71000;
+    expect(engine.elapsed()).toBe(1000);
+  });
   it('runs all eight questions with cards chosen before seeing questions', () => {
     start('2-1');
     expect(engine.state.phase).toBe('WHEEL');
@@ -574,6 +688,20 @@ describe('presentation support', () => {
     );
     expect(engine.state.rounds[1].teamIds).toEqual([1, 6, 7, 8]);
   });
+  it.each(['round.assignTeams', 'bracket.override'])(
+    'rejects duplicate stage entries through %s atomically',
+    (command) => {
+      const before = structuredClone(engine.state);
+      expect(() =>
+        engine.dispatch(command, { key: '1-1', teamIds: [5, 2, 3, 4] }, admin, 'invalid-draw'),
+      ).toThrow('twice');
+      expect(engine.state).toEqual(before);
+      expect(db.prepare('SELECT COUNT(*) AS n FROM event_log').get()).toEqual({ n: 0 });
+      expect(db.prepare('SELECT COUNT(*) AS n FROM commands').get()).toEqual({ n: 0 });
+      engine.dispatch(command, { key: '1-1', teamIds: [4, 3, 2, 1] }, admin);
+      expect(engine.round.teamIds).toEqual([4, 3, 2, 1]);
+    },
+  );
   it('stores team logos outside snapshots and versions them', () => {
     engine.dispatch(
       'teams.save',

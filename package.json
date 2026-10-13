@@ -15,6 +15,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "sim": "tsx tools/simulator.ts",
+    "e2e": "tsx tools/e2e.ts",
     "supervise": "node tools/supervise.mjs",
     "smoke": "playwright test -c playwright.config.ts",
     "tour": "tsx tools/tour.ts",

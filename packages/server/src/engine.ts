@@ -477,6 +477,19 @@ export class Engine {
         .map((r) => r.winner)
         .filter((id): id is number => !!id);
   }
+  private refreshRankingAfterAdjustment() {
+    const s = this.state;
+    if (!['REVIEW', 'TIE_READY', 'TIE_RUNNING', 'TIE_REVIEW'].includes(s.phase)) return;
+    // A correction invalidates any tie-breaker based on the previous scores.
+    s.tieQuestion = undefined;
+    s.ready = [];
+    s.autoAt = 0;
+    s.autoAction = '';
+    s.endsAt = 0;
+    s.remainingMs = 0;
+    s.paused = false;
+    this.resolveRanking();
+  }
   dispatch(
     type: string,
     input: unknown,
@@ -596,6 +609,15 @@ export class Engine {
             new Set(p.teamIds).size === p.teamIds.length &&
             p.teamIds.every((id: number) => this.teams().some((t) => t.id === id)),
           'Invalid lineup',
+        );
+        this.require(
+          !s.rounds.some(
+            (other) =>
+              other !== r &&
+              other.stage === r.stage &&
+              other.teamIds.some((id) => p.teamIds.includes(id)),
+          ),
+          'A team appears twice in the draw',
         );
         r.teamIds = p.teamIds;
         if (r === this.round) {
@@ -968,6 +990,7 @@ export class Engine {
         );
         this.require(!this.round.completed, 'Completed result is locked');
         this.score(p.teamId, p.delta, 'manual', undefined, p.reason);
+        this.refreshRankingAfterAdjustment();
         break;
       }
       case 'undo.last': {
@@ -986,6 +1009,7 @@ export class Engine {
           'Undo manual adjustment',
           row.id,
         );
+        this.refreshRankingAfterAdjustment();
         break;
       }
       case 'question.cancelLeak': {
@@ -1046,7 +1070,6 @@ export class Engine {
         } else {
           this.startQuestion();
         }
-        s.paused = false;
         s.autoAt = 0;
         s.autoAction = '';
         break;
