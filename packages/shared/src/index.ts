@@ -43,7 +43,14 @@ export type Question = z.infer<typeof questionSchema> & {
   used?: boolean;
   deleted?: boolean;
 };
-export type Team = { id: number; code: string; name: string; color: string; status: string };
+export type Team = {
+  id: number;
+  code: string;
+  name: string;
+  color: string;
+  status: string;
+  logoV?: number;
+};
 export type Answer = {
   id: string;
   teamId: number;
@@ -100,6 +107,7 @@ export type Match = {
   paused: boolean;
   autoAt: number;
   autoAction: string;
+  spinAt: number;
   winner?: number;
   tieIds: number[];
   tieQuestion?: number;

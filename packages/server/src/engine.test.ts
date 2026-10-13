@@ -453,3 +453,109 @@ describe('operator overrides and final fallback', () => {
     ).toThrow('deadline');
   });
 });
+describe('presentation support', () => {
+  const png =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  it('exposes check-in, answered flags and bonus without leaking codes', () => {
+    engine.dispatch(
+      'settings.update',
+      { settings: { automation: 'manual', countdownMs: 1 } },
+      admin,
+    );
+    db.prepare(
+      "INSERT INTO devices(id,role,team_id,token_hash,seat_no,last_seen_at) VALUES('d1','team',1,'x',1,?)",
+    ).run(Date.now());
+    const s: any = engine.snapshot({ role: 'display', deviceId: 'display' });
+    expect(s.lineup[0]).toMatchObject({ checkedIn: true, online: true, answered: false, bonus: 0 });
+    expect(s.lineup[1].checkedIn).toBe(false);
+    expect(JSON.stringify(s)).not.toContain('"code"');
+    expect(s.categories.length).toBeGreaterThan(0);
+    const a: any = engine.snapshot({ role: 'admin', deviceId: 'admin' });
+    expect(a.devices.find((d: any) => d.id === 'd1')).toBeTruthy();
+  });
+  it('reports own finish time and bonus to the team only after completing Blitz', () => {
+    start();
+    clock = 85_000;
+    for (let i = 0; i < 10; i++)
+      engine.dispatch(
+        'answer.submit',
+        { roundQuestionId: engine.state.set[i], answer: 0 },
+        team(1),
+        `a${i}`,
+      );
+    const own: any = engine.snapshot(team(1));
+    expect(own.ownFinishMs).toBeGreaterThanOrEqual(85_000);
+    expect(own.ownBonus).toBe(15);
+    expect((engine.snapshot(team(2)) as any).ownBonus).toBe(0);
+    const display: any = engine.snapshot({ role: 'display', deviceId: 'display' });
+    expect(display.lineup[0].bonus).toBe(15);
+    expect(display.lineup[0].answered).toBe(false);
+  });
+  it('forces default cards and records the wheel spin time', () => {
+    start('2-1');
+    engine.dispatch('wheel.spin', {}, admin);
+    expect(engine.state.spinAt).toBeGreaterThan(0);
+    engine.dispatch('card.select', { value: 15 }, team(1));
+    engine.dispatch('cards.forceFill', {}, admin);
+    expect(engine.state.cards).toEqual({ 1: 15, 2: 5, 3: 5, 4: 5 });
+    engine.dispatch('question.start', {}, admin);
+    expect(engine.state.phase).toBe('RUNNING');
+  });
+  it('applies a whole draw atomically and rejects duplicates', () => {
+    const rows = Array.from({ length: 12 }, (_, i) => ({
+      key: `1-${i + 1}`,
+      teamIds: [1, 2, 3, 4].map((n) => 48 - (i * 4 + n) + 1),
+    }));
+    engine.dispatch('bracket.bulk', { assignments: rows }, admin);
+    expect(engine.state.rounds[0].teamIds).toEqual([48, 47, 46, 45]);
+    const before = JSON.stringify(engine.state.rounds);
+    expect(() =>
+      engine.dispatch(
+        'bracket.bulk',
+        {
+          assignments: [
+            { key: '1-1', teamIds: [1, 2, 3, 4] },
+            { key: '1-2', teamIds: [4, 5, 6, 7] },
+          ],
+        },
+        admin,
+      ),
+    ).toThrow('twice');
+    expect(JSON.stringify(engine.state.rounds)).toBe(before);
+  });
+  it('stores team logos outside snapshots and versions them', () => {
+    engine.dispatch(
+      'teams.save',
+      { teams: [{ id: 1, code: '111', name: 'الفريق 1', color: '#27d6b0', logo: png }] },
+      admin,
+    );
+    expect(engine.logo(1)?.logo_mime).toBe('image/png');
+    expect(engine.teams()[0].logoV).toBe(1);
+    expect(JSON.stringify(engine.snapshot({ role: 'display', deviceId: 'd' }))).not.toContain(
+      'base64',
+    );
+    engine.dispatch(
+      'teams.save',
+      { teams: [{ id: 1, code: '111', name: 'الفريق 1', color: '#27d6b0', logo: null }] },
+      admin,
+    );
+    expect(engine.logo(1)?.logo).toBeNull();
+    expect(() =>
+      engine.dispatch(
+        'teams.save',
+        {
+          teams: [
+            {
+              id: 1,
+              code: '111',
+              name: 'x',
+              color: '#27d6b0',
+              logo: 'data:image/svg+xml;base64,AAAA',
+            },
+          ],
+        },
+        admin,
+      ),
+    ).toThrow();
+  });
+});

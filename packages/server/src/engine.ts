@@ -47,10 +47,23 @@ const schema: Record<string, z.ZodTypeAny> = {
           code: z.string().regex(/^\d{3,4}$/),
           name: z.string().trim().min(1).max(100),
           color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+          logo: z
+            .union([
+              z.string().regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/),
+              z.null(),
+            ])
+            .refine((v) => v === null || v.length <= 400_000, 'Logo too large')
+            .optional(),
         }),
       )
       .min(1)
       .max(200),
+  }),
+  'bracket.bulk': z.object({
+    assignments: z
+      .array(z.object({ key: z.string(), teamIds: z.array(z.number().int()).min(3).max(4) }))
+      .min(1)
+      .max(20),
   }),
   'teams.delete': z.object({ id: z.number().int() }),
   'question.cancelLeak': z.object({
@@ -93,6 +106,7 @@ const emptyCommands = new Set([
   'devices.reset',
   'undo.last',
   'questions.resetUsed',
+  'cards.forceFill',
 ]);
 export class Engine {
   state: Match;
@@ -138,11 +152,13 @@ export class Engine {
           paused: false,
           autoAt: 0,
           autoAction: '',
+          spinAt: 0,
           tieIds: [],
           finishMs: {},
           settings: structuredClone(DEFAULTS),
           rounds,
         };
+    this.state.spinAt ??= 0;
     this.state.allottedMs ??= this.state.elapsedMs + this.state.remainingMs;
     this.origin = this.clock();
     this.originElapsed = this.state.elapsedMs;
@@ -158,7 +174,11 @@ export class Engine {
     return this.state.rounds.find((r) => r.key === this.state.roundKey)!;
   }
   teams() {
-    return this.db.prepare('SELECT * FROM teams ORDER BY id').all() as Team[];
+    return this.db
+      .prepare(
+        'SELECT id,code,name,color,status,COALESCE(logo_v,0) AS logoV FROM teams ORDER BY id',
+      )
+      .all() as Team[];
   }
   questions() {
     return (
@@ -184,6 +204,23 @@ export class Engine {
           (this.round.stage === 2 ? this.state.settings.gamblerInitial : 0),
       ]),
     );
+  }
+  private saveLogo(teamId: number, dataUrl: string | null) {
+    if (dataUrl === null)
+      this.db
+        .prepare('UPDATE teams SET logo=NULL,logo_mime=NULL,logo_v=COALESCE(logo_v,0)+1 WHERE id=?')
+        .run(teamId);
+    else {
+      const m = /^data:(image\/[a-z]+);base64,(.*)$/.exec(dataUrl)!;
+      this.db
+        .prepare('UPDATE teams SET logo=?,logo_mime=?,logo_v=COALESCE(logo_v,0)+1 WHERE id=?')
+        .run(Buffer.from(m[2], 'base64'), m[1], teamId);
+    }
+  }
+  logo(teamId: number) {
+    return this.db.prepare('SELECT logo,logo_mime FROM teams WHERE id=?').get(teamId) as
+      | { logo: Buffer | null; logo_mime: string | null }
+      | undefined;
   }
   private persist() {
     this.db
@@ -280,6 +317,7 @@ export class Engine {
       paused: false,
       autoAt: 0,
       autoAction: '',
+      spinAt: 0,
       tieIds: [],
       finishMs: {},
       settings,
@@ -560,6 +598,35 @@ export class Engine {
         }
         break;
       }
+      case 'bracket.bulk': {
+        this.phase('IDLE', 'RULES', 'HANDSHAKE');
+        const all = this.teams();
+        const seen = new Set<number>();
+        for (const a of p.assignments) {
+          const r = s.rounds.find((r) => r.key === a.key);
+          this.require(r && !r.completed, 'Round cannot be changed');
+          this.require(
+            a.teamIds.length === (r.stage === 3 ? 3 : 4) &&
+              new Set(a.teamIds).size === a.teamIds.length &&
+              a.teamIds.every((id: number) => all.some((t) => t.id === id)),
+            'Invalid lineup',
+          );
+          for (const id of a.teamIds) {
+            this.require(!seen.has(id), 'A team appears twice in the draw');
+            seen.add(id);
+          }
+        }
+        for (const a of p.assignments) {
+          const r = s.rounds.find((r) => r.key === a.key)!;
+          r.teamIds = a.teamIds;
+          if (r === this.round) {
+            s.ready = [];
+            s.autoAt = 0;
+            s.autoAction = '';
+          }
+        }
+        break;
+      }
       case 'round.showRules':
         this.phase('IDLE');
         s.phase = 'RULES';
@@ -652,6 +719,14 @@ export class Engine {
         s.category = cats[randomInt(cats.length)];
         s.phase = 'CARD_PICK';
         s.cards = {};
+        s.spinAt = Date.now();
+        break;
+      }
+      case 'cards.forceFill': {
+        this.phase('CARD_PICK');
+        const lowest = Math.min(...s.settings.cards);
+        for (const id of this.round.teamIds) s.cards[id] ??= lowest;
+        this.schedule('question.start');
         break;
       }
       case 'question.start': {
@@ -678,6 +753,7 @@ export class Engine {
         this.require(qs.length, 'Bank exhausted');
         s.category = qs[randomInt(qs.length)].category;
         s.cards = {};
+        s.spinAt = Date.now();
         s.autoAt = 0;
         s.autoAction = '';
         break;
@@ -1139,10 +1215,13 @@ export class Engine {
             this.db
               .prepare('UPDATE teams SET code=?,name=?,color=? WHERE id=?')
               .run(t.code, t.name, t.color, t.id);
-          } else
-            this.db
+            if (t.logo !== undefined) this.saveLogo(t.id, t.logo);
+          } else {
+            const info = this.db
               .prepare('INSERT INTO teams(code,name,color) VALUES(?,?,?)')
               .run(t.code, t.name, t.color);
+            if (t.logo) this.saveLogo(Number(info.lastInsertRowid), t.logo);
+          }
         }
         break;
       }
@@ -1188,6 +1267,7 @@ export class Engine {
             type: q.type,
             options: q.options,
             category: q.category,
+            difficulty: q.difficulty,
             ...(reveal ? { correct: q.correct, explanation: q.explanation } : {}),
           }
         : null;
@@ -1196,12 +1276,29 @@ export class Engine {
       admin || actor.role === 'display' || s.phase === 'RESULTS' || s.phase === 'REVEAL';
     const devices = this.db
       .prepare(
-        "SELECT id,team_id,seat_no,last_seen_at,rtt_ms FROM devices WHERE role='team' AND team_id IS NOT NULL",
+        "SELECT id,role,team_id,seat_no,last_seen_at,rtt_ms FROM devices WHERE role='team' AND team_id IS NOT NULL",
       )
       .all() as any[];
+    const bonusRows = this.db
+      .prepare(
+        "SELECT e.team_id,SUM(e.delta) AS bonus FROM score_events e WHERE e.round_key=? AND (e.kind='speed_bonus' OR (e.kind='reversal' AND e.reverses_id IN (SELECT id FROM score_events WHERE kind='speed_bonus'))) GROUP BY e.team_id",
+      )
+      .all(s.roundKey) as { team_id: number; bonus: number }[];
+    const bonusOf = (teamId: number) => bonusRows.find((r) => r.team_id === teamId)?.bonus ?? 0;
+    const currentQuestionOf = (teamId: number) =>
+      s.tieQuestion ?? (this.round.stage === 1 ? s.set[s.progress[teamId] ?? 0] : s.set[s.index]);
+    const stage2Categories = [
+      ...new Set(
+        this.questions()
+          .filter((x) => x.stage === 2 && x.pool === 'main')
+          .map((x) => x.category),
+      ),
+    ];
     return {
       version: s.version,
       serverNow: Date.now(),
+      spinAt: s.spinAt,
+      categories: stage2Categories,
       roundKey: s.roundKey,
       stage: this.round.stage,
       seq: this.round.seq,
@@ -1236,10 +1333,21 @@ export class Engine {
               score: scoreVisible ? scores[id] : null,
               card: s.cards[id] ?? null,
               finishMs: s.finishMs[id] ?? null,
+              checkedIn: devices.some((d) => d.team_id === id && d.role === 'team'),
+              online: devices.some(
+                (d) => d.team_id === id && d.role === 'team' && d.last_seen_at > Date.now() - 6000,
+              ),
+              answered: s.answers.some(
+                (a) =>
+                  a.teamId === id && a.questionId === currentQuestionOf(id) && a.verdict !== 'void',
+              ),
+              bonus: scoreVisible ? bonusOf(id) : 0,
               device: admin ? devices.find((d) => d.team_id === id) : undefined,
             })),
       ownScore: actor.role === 'team' && s.phase === 'RESULTS' && id ? scores[id] : null,
       ownProgress: id ? (s.progress[id] ?? 0) : 0,
+      ownFinishMs: id ? (s.finishMs[id] ?? null) : null,
+      ownBonus: id && actor.role === 'team' && s.finishMs[id] !== undefined ? bonusOf(id) : 0,
       ownCard: id ? (s.cards[id] ?? null) : null,
       submitted:
         !!id &&
@@ -1255,6 +1363,9 @@ export class Engine {
       ...(admin
         ? {
             teams,
+            devices: this.db
+              .prepare('SELECT id,role,team_id,seat_no,last_seen_at,rtt_ms FROM devices ORDER BY role,id')
+              .all(),
             questions: this.questions(),
             answers: s.answers.filter((a) => a.verdict !== 'void'),
             audit: this.db.prepare('SELECT * FROM event_log ORDER BY id DESC LIMIT 100').all(),

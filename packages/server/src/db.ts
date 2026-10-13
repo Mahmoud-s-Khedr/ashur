@@ -20,6 +20,12 @@ export function openDb(path = process.env.DB_PATH || 'data/ashour.sqlite') {
  CREATE INDEX IF NOT EXISTS idx_answers ON answers(round_key,question_id);
  CREATE VIEW IF NOT EXISTS v_team_round_scores AS SELECT round_key,team_id,SUM(delta) AS score FROM score_events GROUP BY round_key,team_id;
  INSERT OR IGNORE INTO migrations VALUES(1);`);
+  const cols = (db.prepare('PRAGMA table_info(teams)').all() as { name: string }[]).map(
+    (c) => c.name,
+  );
+  if (!cols.includes('logo'))
+    db.exec('ALTER TABLE teams ADD COLUMN logo BLOB; ALTER TABLE teams ADD COLUMN logo_mime TEXT;');
+  if (!cols.includes('logo_v')) db.exec('ALTER TABLE teams ADD COLUMN logo_v INTEGER DEFAULT 0;');
   return db;
 }
 export type DB = ReturnType<typeof openDb>;

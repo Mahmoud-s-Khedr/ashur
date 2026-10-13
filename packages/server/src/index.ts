@@ -260,6 +260,13 @@ app.get('/health', async () => ({
   phase: engine.state.phase,
   paused: engine.state.paused,
 }));
+app.get('/logo/:id', async (req, reply) => {
+  const row = engine.logo(Number((req.params as { id: string }).id));
+  if (!row?.logo || !row.logo_mime) return reply.code(404).send({ error: 'No logo' });
+  reply.header('Content-Type', row.logo_mime);
+  reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+  return reply.send(row.logo);
+});
 app.addHook('onRequest', async (req, reply) => {
   if (req.url.startsWith('/api/') && !authorized(req))
     return reply.code(401).send({ error: 'Admin authentication required' });
@@ -279,6 +286,13 @@ app.post('/api/command', async (req, reply) => {
     return reply.code(400).send({ error: e instanceof Error ? e.message : 'Invalid command' });
   }
 });
+app.get('/api/network', async () => ({
+  port,
+  addresses: Object.values(networkInterfaces())
+    .flatMap((entries) => entries ?? [])
+    .filter((a) => a.family === 'IPv4' && !a.internal)
+    .map((a) => a.address),
+}));
 app.get('/api/export', async () => ({
   state: engine.state,
   teams: engine.teams(),
