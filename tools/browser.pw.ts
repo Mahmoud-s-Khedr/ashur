@@ -98,3 +98,21 @@ test('Arabic admin, team and display screens work without external runtime reque
   ).toBe(true);
   await context.close();
 });
+
+test('English and low-effects modes render without errors on every route', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/display?lang=en&fx=low');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+  await expect(page.locator('html')).toHaveClass(/low-fx/);
+  await expect(page.locator('.display-root')).toBeVisible();
+  await page.goto('/play?lang=en');
+  await expect(page.getByRole('heading', { name: 'Enter your team code' })).toBeVisible();
+  await page.goto('/admin?lang=en');
+  await expect(page.getByLabel('Admin PIN')).toBeVisible();
+  // Switch back so later tests and manual runs start in Arabic.
+  await page.goto('/?lang=ar');
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  expect(errors).toEqual([]);
+});

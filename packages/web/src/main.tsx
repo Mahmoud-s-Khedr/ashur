@@ -20,6 +20,7 @@ import './styles/base.css';
 
 function App() {
   const path = location.pathname;
+  const lowFx = new URLSearchParams(location.search).get('fx') === 'low';
   const role: Role = path === '/admin' ? 'admin' : path === '/play' ? 'team' : 'display';
   const [pin, setPin] = useState(sessionStorage.getItem('ashour-pin') ?? '');
   const [inputPin, setInputPin] = useState('');
@@ -90,7 +91,6 @@ function App() {
   const remaining = s ? (s.paused ? s.remainingMs : Math.max(0, s.endsAt - serverNow)) : 0;
   // Check-in problems are shown inside the keypad; only other errors use the global banner.
   const inlineError = role === 'team' && !s?.team;
-  const lowFx = new URLSearchParams(location.search).get('fx') === 'low';
   return (
     <div className={`app ${role}`}>
       <div className={`connection ${c.connected ? '' : 'disconnected'}`}>
