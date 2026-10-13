@@ -34,8 +34,8 @@ Commands implemented:
 | Admin | `round.select {key}`, `round.assignTeams {teamIds}`, `round.showRules`, `lineup.announce`, `round.openHandshake`, `round.start`, `round.forceStart`, `round.pause`, `round.resume`, `round.next` |
 | Admin | `automation.set {mode}`, `auto.cancel`, `wheel.spin`, `question.start`, `question.reroll`, `question.next`, `question.reveal`, `question.cancelLeak {questionId?,replacementId?}`                |
 | Admin | `grade.set {answerId,verdict}`, `score.adjust {teamId,delta,reason}`, `undo.last`, `tiebreak.open`, `tiebreak.launch {questionId?}`                                                              |
-| Admin | `checkin.kick {teamId}`, `devices.reset`, `bracket.override {key,teamIds}`, `display.scene {scene}`, `settings.update {settings}`                                                                |
-| Admin | `teams.save {teams}`, `teams.delete {id}`, `questions.save {questions}`, `questions.delete {id}`, `questions.resetUsed`, `set.build {seq,questionIds}`                                           |
+| Admin | `checkin.kick {teamId}`, `devices.reset`, `bracket.override {key,teamIds}`, `bracket.bulk {assignments:[{key,teamIds}]}` (atomic draw), `cards.forceFill`, `display.scene {scene}`, `settings.update {settings}` |
+| Admin | `teams.save {teams}` (each team may carry `logo`: a PNG/JPEG/WebP data URL ≤ 400 KB, or `null` to remove), `teams.delete {id}`, `questions.save {questions}`, `questions.delete {id}`, `questions.resetUsed`, `set.build {seq,questionIds}`                                           |
 
 Text/numeric `answer` is a string; MCQ `answer` is a zero-based index. `roundQuestionId` refers to the question's stable ID. A cancelled question's replacement receives a different ID. A previously used question cannot appear in a different round. One non-void submission is accepted per team/question in that round.
 
@@ -48,5 +48,12 @@ HTTP:
 - `GET /api/export`: complete JSON data/answers/ledger/audit.
 - `GET /api/results.csv`: UTF-8 BOM results.
 - `GET /api/backup`: online SQLite backup download.
+- `GET /api/network`: the server's LAN IPv4 addresses and port (used by the QR codes).
+- `GET /logo/:teamId?v=<n>`: public team logo bytes with immutable caching (the version comes from the snapshot's `logoV`).
 
 All `/api/*` requests require `Authorization: Bearer <admin device token>`. Static pages and locally bundled assets are served by the same port. Each socket is limited to 100 incoming messages per second; five failed code attempts lock that device for ten seconds, and five bad PIN attempts lock the source IP for ten seconds.
+
+
+## Snapshot fields added for presentation
+
+Every snapshot carries `spinAt` (server wall-clock ms of the last category spin, used to time the reel animation) and `categories` (all Stage-2 categories, for the reel strip). Lineup entries (display/admin) add `checkedIn`, `online`, `answered` (this question), `bonus` (speed bonus points) and, in the reveal phase of Stage 2/3 only, `verdict`. Team snapshots add `ownFinishMs` and `ownBonus` after a Blitz finish (never any correctness information). Admin snapshots add `devices` (every connected device with RTT) and `set` (the active round's question IDs). Team logos are referenced by `logoV` and fetched from `/logo/:id`, never embedded.

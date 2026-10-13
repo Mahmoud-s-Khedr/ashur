@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ar as t } from '../../../shared/src/ar';
+import { t } from '../lib/i18n';
 import type { Bulk, Send, Snapshot } from '../lib/types';
 import { TeamMark, cssVars } from '../ui/parts';
 import { FilePick, Importer, Modal, Section, imageToLogo, shuffle } from './common';

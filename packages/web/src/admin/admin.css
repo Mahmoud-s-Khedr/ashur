@@ -1185,3 +1185,15 @@ td code {
   opacity: 0;
   cursor: pointer;
 }
+
+.admin-shell .badge,
+.admin-shell .chip {
+  gap: 0.35em;
+}
+.lineup-panel small {
+  display: block;
+  margin-top: 8px;
+}
+.lineup-panel > button.primary {
+  width: 100%;
+}

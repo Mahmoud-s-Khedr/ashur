@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { resolve, basename } from 'node:path';
 import { networkInterfaces } from 'node:os';
 import { z } from 'zod';
+import QRCode from 'qrcode';
 import { envelope, type Role } from '@ashour/shared';
 import { openDb } from './db';
 import { seed } from './seed';
@@ -230,6 +231,8 @@ const heartbeat = setInterval(() => {
     c.lastPing = Date.now();
     ws.ping();
   }
+  // Fresh snapshots keep device online/RTT indicators truthful even when nothing else is happening.
+  broadcast();
 }, 2000);
 const ticker = setInterval(() => {
   if (engine.state.paused) return;
@@ -367,10 +370,17 @@ if (existsSync(dist)) {
 }
 await app.listen({ port, host });
 console.log(`Ashour LAN server: http://localhost:${port}/admin`);
-for (const entries of Object.values(networkInterfaces()))
-  for (const a of entries ?? [])
-    if (a.family === 'IPv4' && !a.internal)
-      console.log(`LAN: http://${a.address}:${port}/play · /display · /admin`);
+const lanAddresses = Object.values(networkInterfaces())
+  .flatMap((entries) => entries ?? [])
+  .filter((a) => a.family === 'IPv4' && !a.internal)
+  .map((a) => a.address);
+for (const address of lanAddresses)
+  console.log(`LAN: http://${address}:${port}/play · /display · /admin`);
+if (lanAddresses[0]) {
+  const url = `http://${lanAddresses[0]}:${port}/play`;
+  console.log(`\nTeam device QR (${url}):`);
+  console.log(await QRCode.toString(url, { type: 'terminal', small: true }));
+}
 async function shutdown() {
   clearInterval(heartbeat);
   clearInterval(ticker);

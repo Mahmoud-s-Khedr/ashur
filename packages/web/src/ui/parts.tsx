@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ar as t } from '../../../shared/src/ar';
+import { t } from '../lib/i18n';
 import type { PublicTeam } from '../lib/types';
 
 export const cssVars = (vars: Record<string, string | number>) => vars as React.CSSProperties;
@@ -243,4 +243,35 @@ export function Pips({ total, done, current }: { total: number; done: number; cu
       ))}
     </div>
   );
+}
+
+/**
+ * A rendering error in one scene must never leave a dead screen during a live event:
+ * show a short notice, then reload to rebuild state from the server snapshot.
+ */
+export class ScreenGuard extends React.Component<
+  { children: React.ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.error('Screen error, reloading:', error);
+    this.timer = setTimeout(() => location.reload(), 2500);
+  }
+  componentWillUnmount() {
+    clearTimeout(this.timer);
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="loading" role="alert">
+        <div className="pulse" />
+        {t.recovering}
+      </div>
+    );
+  }
 }

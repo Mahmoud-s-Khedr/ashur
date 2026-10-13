@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { ar as t } from '../../../shared/src/ar';
+import { t } from '../lib/i18n';
 import type { Send, Snapshot } from '../lib/types';
 import { identity } from '../ws';
 import { Section } from './common';
@@ -53,7 +53,7 @@ export function SetupTab({ s, send }: { s: Snapshot; send: Send }) {
   const hosts = net?.addresses.length ? net.addresses : [location.hostname];
   const port = net?.port ?? Number(location.port || 80);
   const teamName = (id: number | null) => s.teams?.find((x) => x.id === id)?.name ?? '—';
-  const now = Date.now();
+  const now = s.serverNow;
   return (
     <>
       <Section title={t.connectDevices}>

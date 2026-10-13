@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ar as t } from '../../../shared/src/ar';
+import { t, dir } from '../lib/i18n';
 import type { Team } from '@ashour/shared';
 import type { Snapshot } from '../lib/types';
 import { identity } from '../ws';
@@ -74,7 +74,7 @@ export function ExportsTab({ s }: { s: Snapshot }) {
               if (!popup) throw new Error('Allow popups to print');
               const doc = popup.document;
               doc.title = t.results;
-              doc.documentElement.dir = 'rtl';
+              doc.documentElement.dir = dir;
               const heading = doc.createElement('h1');
               heading.textContent = t.results;
               doc.body.append(heading);

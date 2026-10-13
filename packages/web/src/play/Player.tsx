@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ar as t, phaseNames } from '../../../shared/src/ar';
+import { t, phaseNames, arrow } from '../lib/i18n';
 import type { Send, Snapshot } from '../lib/types';
 import { toSeconds, useCountUp, usePrevious } from '../lib/hooks';
 import { Confetti, Pips, TeamMark, cssVars, Of } from '../ui/parts';
@@ -101,7 +101,7 @@ function CodeEntry({
         disabled={code.length < 3}
         onClick={() => send('team.checkin', { code })}
       >
-        {t.checkin} ←
+        {t.checkin} {arrow}
       </button>
     </section>
   );
@@ -277,7 +277,9 @@ function Question({ s, send, remaining }: { s: Snapshot; send: Send; remaining: 
             maxLength={2000}
             placeholder={t.typeAnswer}
           />
-          <button className="primary">{t.submit} ←</button>
+          <button className="primary">
+            {t.submit} {arrow}
+          </button>
         </form>
       )}
     </section>
@@ -395,9 +397,16 @@ export function Player({
     }
   }, [teamId]);
   useEffect(() => {
+    // Kiosk behaviour: no context menu, and the browser's Back button cannot leave the game.
     const block = (e: Event) => e.preventDefault();
+    const stay = () => history.pushState(null, '', location.href);
     document.addEventListener('contextmenu', block);
-    return () => document.removeEventListener('contextmenu', block);
+    history.pushState(null, '', location.href);
+    window.addEventListener('popstate', stay);
+    return () => {
+      document.removeEventListener('contextmenu', block);
+      window.removeEventListener('popstate', stay);
+    };
   }, []);
 
   if (!s.team)

@@ -6,7 +6,11 @@ Record date, server model/OS, router model, software commit, browser versions, n
 - [ ] Static/DHCP-reserved server IP; four competitor PCs, admin and projector on wired Ethernet.
 - [ ] Server firewall allows inbound TCP 3000; every device reaches `/health` and its correct route.
 - [ ] Sleep, screensavers, notifications and updates disabled. One tab/device identity per PC.
-- [ ] Projector is readable from the back of the room; Arabic shaping, RTL, Western digits and sound work.
+- [ ] Projector is readable from the back of the room; Arabic shaping, RTL, Western digits and sound work. Walk the whole tournament once with `pnpm tour` to preview every scene, then repeat on the real projector at its native resolution.
+- [ ] Slot machine, ladder and champion ceremony animate smoothly on the projector computer (no dropped frames); confetti and sound start together.
+- [ ] Upload a team logo; check it on the lineup reveal, bracket and ladder. Print the code cards and confirm they are legible.
+- [ ] Try the draw tool (swap by drag, random shuffle) and confirm the bracket and lineups update on the projector.
+- [ ] Back button and right-click are blocked on competitor PCs (use a kiosk profile to block OS shortcuts).
 - [ ] Enter any team's code on each physical PC; check readiness, wrong-code lockout and second-device rejection.
 - [ ] Kick/reassign a device; refresh during a question; verify restored identity/progress and submitted lock.
 - [ ] Confirm no team receives correct answers or other team responses; projector hides questions during team time except progress in Blitz.

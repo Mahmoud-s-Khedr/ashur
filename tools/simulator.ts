@@ -249,6 +249,7 @@ try {
   await admin.cmd('round.forceStart');
   await wait(() => admin.s.phase === 'RUNNING', 'final question');
   // Crash while the question is live. All identities and current question survive.
+  await wait(() => teams[0].s.question, 'final question reaches the team');
   const questionId = teams[0].s.question.id;
   for (const b of all) b.close();
   server.kill('SIGKILL');

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ar as t, ackLabels } from '../../shared/src/ar';
+import { t, ackLabels, dir, lang, switchLang } from './lib/i18n';
 import type { Role } from '@ashour/shared';
 import { useConnection, identity } from './ws';
 import { useNow } from './lib/hooks';
-import { useToasts } from './ui/parts';
+import { ScreenGuard, useToasts } from './ui/parts';
 import { Admin } from './admin/Admin';
 import { Display } from './display/Display';
 import { Player } from './play/Player';
@@ -33,6 +33,9 @@ function App() {
   const serverNow = now + c.offset;
 
   useEffect(() => {
+    document.documentElement.lang = lang;
+    document.documentElement.dir = dir;
+    document.title = t.title;
     document.documentElement.classList.toggle('display-page', path === '/display');
     document.documentElement.classList.toggle('play-page', path === '/play');
   }, [path]);
@@ -50,6 +53,9 @@ function App() {
           <a href="/play">{t.play} ↗</a>
         </div>
         <small>{t.offlineHint}</small>
+        <button className="ghost" onClick={() => switchLang(lang === 'ar' ? 'en' : 'ar')}>
+          {lang === 'ar' ? 'English' : 'العربية'}
+        </button>
       </div>
     );
   if (role === 'admin' && !pin)
@@ -121,28 +127,34 @@ function App() {
           <div className="pulse" />
         </div>
       ) : role === 'admin' ? (
-        <Admin
-          s={s}
-          send={c.send}
-          bulk={c.bulk}
-          remaining={remaining}
-          now={serverNow}
-          connected={c.connected}
-          toasts={toasts}
-        />
-      ) : role === 'team' ? (
-        <div className={c.connected ? '' : 'offline-lock'}>
-          <Player
+        <ScreenGuard>
+          <Admin
             s={s}
             send={c.send}
+            bulk={c.bulk}
             remaining={remaining}
             now={serverNow}
-            error={c.error}
-            clearError={() => c.setError('')}
+            connected={c.connected}
+            toasts={toasts}
           />
+        </ScreenGuard>
+      ) : role === 'team' ? (
+        <div className={c.connected ? '' : 'offline-lock'}>
+          <ScreenGuard>
+            <Player
+              s={s}
+              send={c.send}
+              remaining={remaining}
+              now={serverNow}
+              error={c.error}
+              clearError={() => c.setError('')}
+            />
+          </ScreenGuard>
         </div>
       ) : (
-        <Display s={s} remaining={remaining} now={serverNow} />
+        <ScreenGuard>
+          <Display s={s} remaining={remaining} now={serverNow} />
+        </ScreenGuard>
       )}
     </div>
   );

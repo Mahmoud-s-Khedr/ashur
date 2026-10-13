@@ -1,5 +1,5 @@
 import React from 'react';
-import { ar as t } from '../../../shared/src/ar';
+import { t } from '../lib/i18n';
 import type { LineupTeam, Snapshot } from '../lib/types';
 import { type TeamFx, useCountUp, toSeconds } from '../lib/hooks';
 import { Confetti, TeamMark, cssVars, Of } from '../ui/parts';

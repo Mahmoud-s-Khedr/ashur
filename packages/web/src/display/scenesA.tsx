@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ar as t } from '../../../shared/src/ar';
+import { t } from '../lib/i18n';
 import type { Snapshot } from '../lib/types';
 import { Bracket } from '../ui/Bracket';
 import { TeamMark, TimerRing, cssVars, Of } from '../ui/parts';
@@ -31,9 +31,7 @@ export function Intro() {
               <small>{step.label}</small>
             </div>
             {i < steps.length - 1 && (
-              <span className="funnel-arrow" style={{ animationDelay: `${0.65 + i * 0.35}s` }}>
-                ‹
-              </span>
+              <span className="funnel-arrow" style={{ animationDelay: `${0.65 + i * 0.35}s` }} />
             )}
           </React.Fragment>
         ))}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ar as t } from '../../../shared/src/ar';
+import { t } from '../lib/i18n';
 import type { PublicTeam, RoundView } from '../lib/types';
 import { Of, TeamMark, cssVars } from './parts';
 import { Trophy } from './icons';

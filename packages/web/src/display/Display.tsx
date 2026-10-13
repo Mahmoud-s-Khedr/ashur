@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ar as t } from '../../../shared/src/ar';
+import { t, dir } from '../lib/i18n';
 import type { Snapshot } from '../lib/types';
 import { usePrevious, useTeamEffects, type DisplayEvent } from '../lib/hooks';
 import { sfx } from '../lib/sfx';
@@ -205,7 +205,7 @@ export function Display({ s, remaining, now }: { s: Snapshot; remaining: number;
   }
   const qualified = s.rounds.filter((r) => r.stage === 1 && r.completed).length;
   return (
-    <main className={`display-root ${idle ? 'idle' : ''}`} data-stage={s.stage} dir="rtl">
+    <main className={`display-root ${idle ? 'idle' : ''}`} data-stage={s.stage} dir={dir}>
       <div className="aurora" aria-hidden="true">
         <i />
         <i />

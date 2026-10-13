@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ar as t } from '../../../shared/src/ar';
+import { t } from '../lib/i18n';
 import { identity } from '../ws';
 import { parseImport } from '../import';
 import type { Bulk } from '../lib/types';

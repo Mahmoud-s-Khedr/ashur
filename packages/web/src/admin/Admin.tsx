@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ar as t, phaseNames } from '../../../shared/src/ar';
+import { t, phaseNames, lang, switchLang } from '../lib/i18n';
 import type { Bulk, Send, Snapshot } from '../lib/types';
 import { ToastStack, TimerRing } from '../ui/parts';
 import { stageName } from './common';
@@ -101,6 +101,9 @@ export function Admin({
           <a href="/play" target="_blank" rel="noreferrer">
             {t.play} ↗
           </a>
+          <button className="mini ghost" onClick={() => switchLang(lang === 'ar' ? 'en' : 'ar')}>
+            {lang === 'ar' ? 'English' : 'العربية'}
+          </button>
           <small>
             {t.local} · v<span className="num">{s.version}</span>
           </small>

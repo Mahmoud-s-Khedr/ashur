@@ -1,6 +1,6 @@
 import { Of } from '../ui/parts';
 import React, { useMemo, useState } from 'react';
-import { ar as t } from '../../../shared/src/ar';
+import { t } from '../lib/i18n';
 import type { Question } from '@ashour/shared';
 import type { Bulk, Send, Snapshot } from '../lib/types';
 import { Importer, Modal, Section, stageName } from './common';

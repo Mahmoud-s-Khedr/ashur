@@ -16,7 +16,9 @@ export default defineConfig({
         ? { executablePath: process.env.CHROMIUM_PATH }
         : existsSync('/usr/bin/chromium')
           ? { executablePath: '/usr/bin/chromium' }
-          : {}),
+          : existsSync('/opt/pw-browsers/chromium')
+            ? { executablePath: '/opt/pw-browsers/chromium' }
+            : {}),
       args: ['--no-sandbox'],
     },
   },

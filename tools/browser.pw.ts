@@ -19,8 +19,11 @@ test('Arabic admin, team and display screens work without external runtime reque
   await expect(page.locator('.team-card')).toHaveCount(4);
   await page.getByLabel('تلقائي', { exact: true }).selectOption('manual');
   await page.screenshot({ path: testInfo.outputPath('ashour-admin.png'), fullPage: true });
+
+  // Question bank editing through the visual editor.
   await page.getByRole('button', { name: /بنك الأسئلة/ }).click();
-  await expect(page.locator('tbody tr')).toHaveCount(180);
+  await expect(page.locator('.set-card.ok')).toHaveCount(12);
+  await expect(page.locator('tbody tr').first()).toBeVisible();
   await page.getByRole('button', { name: 'تعديل', exact: true }).first().click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
@@ -28,9 +31,14 @@ test('Arabic admin, team and display screens work without external runtime reque
   await dialog.getByRole('button', { name: 'حفظ', exact: true }).click();
   await expect(dialog).not.toBeVisible();
   await expect(page.locator('tbody tr').first()).toContainText('سؤال اختبار واجهة');
+
+  // Setup page: QR codes are generated locally.
+  await page.getByRole('button', { name: /الإعداد والأجهزة/ }).click();
+  await expect(page.locator('.qr svg').first()).toBeVisible();
   await page.getByRole('button', { name: /إدارة الجولة/ }).click();
   await page.getByRole('button', { name: 'عرض القواعد ←', exact: true }).click();
   await page.getByRole('button', { name: 'إعلان الفرق وفتح الجاهزية ←', exact: true }).click();
+
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   await context.addInitScript(() => {
     Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true });
@@ -40,27 +48,47 @@ test('Arabic admin, team and display screens work without external runtime reque
   play.on('pageerror', (e) => errors.push(e.message));
   projector.on('pageerror', (e) => errors.push(e.message));
   await play.goto('/play');
-  await play.getByLabel('كود الفريق').fill('111');
+  for (const digit of '111')
+    await play.locator('.keypad button', { hasText: new RegExp(`^${digit}$`) }).click();
   await play.getByRole('button', { name: 'دخول المسابقة ←', exact: true }).click();
-  await expect(play.locator('.player-team')).toContainText('الفريق 1');
-  await play.getByRole('button', { name: 'مستعد ←', exact: true }).click();
-  await expect(play.locator('.ready-button')).toContainText('✓');
+  await expect(play.locator('.p-head')).toContainText('الفريق 1');
+  await expect(play.locator('.ready-orb')).toBeVisible({ timeout: 6000 });
+  await play.locator('.ready-orb').click({ force: true });
+  await expect(play.locator('.ready-orb.is-ready')).toBeVisible();
   await projector.goto('/display');
-  await expect(projector.locator('.public-lineup article')).toHaveCount(4);
+  await expect(projector.locator('.lineup .slot')).toHaveCount(4);
+  await expect(projector.locator('.slot.ready')).toHaveCount(1);
   await projector.screenshot({ path: testInfo.outputPath('ashour-display.png'), fullPage: true });
   await page.getByRole('button', { name: 'بدء إجباري', exact: true }).click();
-  await expect(play.locator('.answer-options')).toBeVisible({ timeout: 10000 });
+  await expect(play.locator('.options .opt').first()).toBeVisible({ timeout: 10000 });
   await play.screenshot({ path: testInfo.outputPath('ashour-play.png'), fullPage: true });
-  await play.locator('.answer-options button').first().click();
-  await expect(play.locator('.question-top')).toContainText('2 / 10');
+  await play.locator('.options .opt').first().click();
+  await expect(play.locator('.q-top')).toContainText('2 من 10');
   await play.reload();
-  await expect(play.locator('.question-top')).toContainText('2 / 10');
+  await expect(play.locator('.q-top')).toContainText('2 من 10');
   await page.getByRole('button', { name: 'إيقاف مؤقت', exact: true }).click();
   await expect(play.getByRole('heading', { name: 'الجولة متوقفة مؤقتاً' })).toBeVisible();
-  await page.getByRole('button', { name: 'استئناف ←', exact: true }).click();
-  await expect(play.locator('.answer-options')).toBeVisible();
+  await expect(projector.locator('.d-paused')).toBeVisible();
+  await page.locator('.hero-btn').click();
+  await expect(play.locator('.options .opt').first()).toBeVisible();
   await play.setViewportSize({ width: 390, height: 844 });
-  await expect(play.locator('.answer-options')).toBeVisible();
+  await expect(play.locator('.options .opt').first()).toBeVisible();
+  await play.bringToFront(); // background tabs freeze CSS animations
+  await play.waitForTimeout(700);
+  const offenders = await play.evaluate(() =>
+    [...document.querySelectorAll('body *')]
+      .filter(
+        (e) =>
+          e.getBoundingClientRect().right > window.innerWidth + 1 ||
+          e.getBoundingClientRect().left < -1,
+      )
+      .map(
+        (e) =>
+          `${e.tagName}.${(e as HTMLElement).className} ${JSON.stringify(e.getBoundingClientRect())} iw=${window.innerWidth}`,
+      )
+      .slice(0, 8),
+  );
+  expect(offenders).toEqual([]);
   expect(await play.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );

@@ -16,6 +16,7 @@ html.play-page textarea {
   width: min(100%, 820px);
   margin: 0 auto;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   background: radial-gradient(
     600px 400px at 50% -10%,
@@ -54,6 +55,7 @@ html.play-page textarea {
 }
 .p-body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-content: center;
   padding: 16px 16px 28px;
   animation: slide-up 0.45s var(--ease) both;

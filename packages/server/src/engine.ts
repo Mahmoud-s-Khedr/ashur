@@ -181,13 +181,17 @@ export class Engine {
       )
       .all() as Team[];
   }
+  /** Parsed question bank, reused between mutations (every dispatch drops it). */
+  private bank: Question[] | null = null;
   questions() {
-    return (
+    this.bank ??= (
       this.db.prepare('SELECT * FROM questions WHERE is_deleted=0 ORDER BY id').all() as {
         json: string;
         is_used: number;
       }[]
     ).map((r) => ({ ...JSON.parse(r.json), used: !!r.is_used })) as Question[];
+    // Callers may reorder or tweak the array; hand out copies of the list, not the cache.
+    return this.bank.map((q) => ({ ...q }));
   }
   question(id: number) {
     return this.questions().find((q) => q.id === id);
@@ -220,8 +224,7 @@ export class Engine {
   }
   logo(teamId: number) {
     return this.db.prepare('SELECT logo,logo_mime FROM teams WHERE id=?').get(teamId) as
-      | { logo: Buffer | null; logo_mime: string | null }
-      | undefined;
+      { logo: Buffer | null; logo_mime: string | null } | undefined;
   }
   private persist() {
     this.db
@@ -500,6 +503,7 @@ export class Engine {
         .get(actorKey, cmdId) as { result_json: string } | undefined;
       if (prior) return { ...JSON.parse(prior.result_json), duplicate: true };
     }
+    this.bank = null;
     const before = structuredClone(this.state);
     const originBefore = this.origin,
       elapsedBefore = this.originElapsed;
@@ -510,6 +514,7 @@ export class Engine {
           this.state.autoAction = '';
         }
         const result = this.apply(type, p, actor);
+        this.bank = null;
         this.state.version++;
         this.persist();
         if (type !== 'system.tick')
@@ -523,6 +528,7 @@ export class Engine {
         return result;
       })();
     } catch (e) {
+      this.bank = null;
       this.state = before;
       this.origin = originBefore;
       this.originElapsed = elapsedBefore;
@@ -1374,7 +1380,9 @@ export class Engine {
             teams,
             set: s.set,
             devices: this.db
-              .prepare('SELECT id,role,team_id,seat_no,last_seen_at,rtt_ms FROM devices ORDER BY role,id')
+              .prepare(
+                'SELECT id,role,team_id,seat_no,last_seen_at,rtt_ms FROM devices ORDER BY role,id',
+              )
               .all(),
             questions: this.questions(),
             answers: s.answers.filter((a) => a.verdict !== 'void'),

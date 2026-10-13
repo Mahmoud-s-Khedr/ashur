@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ar as t, phaseNames } from '../../../shared/src/ar';
+import { t, phaseNames, arrow } from '../lib/i18n';
 import type { Question } from '@ashour/shared';
 import type { LineupTeam, Send, Snapshot } from '../lib/types';
 import { formatClock, toSeconds } from '../lib/hooks';
@@ -7,9 +7,15 @@ import { TeamMark, TimerRing, cssVars, Of } from '../ui/parts';
 import { Check, Cross, Crown } from '../ui/icons';
 import { Section, stageName } from './common';
 
-type Action = { cmd: string; label: string; disabled?: boolean; hint?: string };
+type Action = {
+  cmd: string;
+  label: string;
+  disabled?: boolean;
+  hint?: string;
+  payload?: Record<string, unknown>;
+};
 
-function primaryAction(s: Snapshot): Action | undefined {
+function primaryAction(s: Snapshot, tieQuestion?: number): Action | undefined {
   if (s.stage === 3 && s.phase === 'RESULTS') return undefined;
   if (s.paused) return { cmd: 'round.resume', label: t.resume };
   const everyoneReady = s.lineup.length > 0 && s.ready.length >= s.lineup.length;
@@ -45,6 +51,7 @@ function primaryAction(s: Snapshot): Action | undefined {
     case 'TIE_READY':
       return {
         cmd: 'tiebreak.launch',
+        payload: tieQuestion ? { questionId: tieQuestion } : undefined,
         label: t.launchTie,
         disabled: s.ready.length < s.tieIds.length,
         hint: t.waitReadyHint,
@@ -102,7 +109,7 @@ function TeamCard({ s, team, i, send }: { s: Snapshot; team: LineupTeam; i: numb
   const answers = (s.answers ?? [])
     .filter((a: any) => a.teamId === team.id && a.verdict !== 'void')
     .sort((a: any, b: any) => a.elapsedUs - b.elapsedUs);
-  const online = !!team.device && team.device.last_seen_at > Date.now() - 6000;
+  const online = !!team.device && team.device.last_seen_at > s.serverNow - 6000;
   const status = team.ready ? 'ready' : team.checkedIn ? 'in' : 'wait';
   const rank = [...s.lineup]
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
@@ -387,7 +394,9 @@ function Emergency({ s, send }: { s: Snapshot; send: Send }) {
 }
 
 export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; remaining: number }) {
-  const action = primaryAction(s);
+  const [tieQ, setTieQ] = useState('');
+  const action = primaryAction(s, tieQ ? Number(tieQ) : undefined);
+  const tieOptions = (s.questions ?? []).filter((q: Question) => q.pool !== 'main' && !q.used);
   const pending = (s.answers ?? []).filter((a: any) => a.verdict === 'pending');
   const total =
     s.phase === 'COUNTDOWN'
@@ -400,7 +409,7 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
     function handler(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && action && !action.disabled) {
-        send(action.cmd);
+        send(action.cmd, action.payload);
         return;
       }
       if (target.matches('input,textarea,select') || !pending.length) return;
@@ -431,13 +440,27 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
                 <button
                   className="primary hero-btn"
                   disabled={action.disabled}
-                  onClick={() => send(action.cmd)}
+                  onClick={() => send(action.cmd, action.payload)}
                   title={action.disabled ? action.hint : t.ctrlEnter}
                 >
-                  {action.label} ←
+                  {action.label} {arrow}
                 </button>
               )}
               {action?.disabled && <small className="muted">{action.hint}</small>}
+              {s.phase === 'TIE_READY' && (
+                <select
+                  aria-label={t.tieQuestionPick}
+                  value={tieQ}
+                  onChange={(e) => setTieQ(e.target.value)}
+                >
+                  <option value="">{t.tieQuestionAuto}</option>
+                  {tieOptions.map((q: Question) => (
+                    <option key={q.id} value={q.id}>
+                      #{q.id} · {t[q.type]} · {q.body.slice(0, 40)}
+                    </option>
+                  ))}
+                </select>
+              )}
               <span className="badge">
                 <Of a={s.ready.length} b={s.lineup.length} /> {t.ready}
               </span>

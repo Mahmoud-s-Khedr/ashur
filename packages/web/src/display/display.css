@@ -2124,3 +2124,31 @@ html.display-page body {
 .wager-reveal .wc-face small {
   margin-top: -0.9rem;
 }
+
+/* ---- direction-aware glyphs and anchors (English mode is LTR) ---- */
+.funnel-arrow::before {
+  content: '‹';
+}
+[dir='ltr'] .funnel-arrow::before,
+[dir='ltr'] .b-link::after {
+  content: '›';
+}
+[dir='ltr'] .b-link {
+  border-radius: 0 0.8rem 0.8rem 0;
+}
+[dir='ltr'] .track .runner,
+[dir='ltr'] .pawn {
+  transform: translate(-50%, -50%);
+}
+[dir='ltr'] .pawn {
+  transform: translate(-50%, 50%);
+}
+[dir='ltr'] .b-link::after {
+  inset-inline-end: auto;
+  inset-inline-start: -0.35rem;
+}
+
+.display-root .chip,
+.display-root .badge {
+  gap: 0.35em;
+}

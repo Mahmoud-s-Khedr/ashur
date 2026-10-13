@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ar as t } from '../../../shared/src/ar';
+import { t } from '../lib/i18n';
 import type { Settings } from '@ashour/shared';
 import type { Send, Snapshot } from '../lib/types';
 import { Section } from './common';

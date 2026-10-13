@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ar as t } from '../../../shared/src/ar';
+import { t } from '../lib/i18n';
 import type { Send, Snapshot } from '../lib/types';
 import { Bracket, type SwapRef } from '../ui/Bracket';
 import { Section, shuffle } from './common';

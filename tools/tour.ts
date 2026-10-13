@@ -16,6 +16,8 @@ const PORT = Number(process.env.TOUR_PORT || 3201);
 const PIN = 'tour-demo-pin';
 const OUT = resolve(process.env.TOUR_OUT || 'tour-shots');
 mkdirSync(OUT, { recursive: true });
+const LANG = process.env.TOUR_LANG === 'en' ? 'en' : 'ar';
+const Q = LANG === 'en' ? '?lang=en' : '';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let n = 0;
 
@@ -73,7 +75,9 @@ class Client {
       if (this.snap && pred(this.snap)) return this.snap;
       await sleep(30);
     }
-    throw new Error(`timeout waiting; phase=${this.snap?.phase} cards=${JSON.stringify(this.snap?.lineup?.map((l: any) => l.card))} q=${this.snap?.index}`);
+    throw new Error(
+      `timeout waiting; phase=${this.snap?.phase} cards=${JSON.stringify(this.snap?.lineup?.map((l: any) => l.card))} q=${this.snap?.index}`,
+    );
   }
 }
 
@@ -123,37 +127,33 @@ async function run() {
   };
   const dctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
   const display = await dctx.newPage();
-  await display.goto(`http://127.0.0.1:${PORT}/display`);
+  await display.goto(`http://127.0.0.1:${PORT}/display${Q}`);
   const pctx = await browser.newContext({ viewport: { width: 420, height: 860 }, hasTouch: true });
   const player = await pctx.newPage();
-  await player.goto(`http://127.0.0.1:${PORT}/play`);
+  await player.goto(`http://127.0.0.1:${PORT}/play${Q}`);
   const actx = await browser.newContext({ viewport: { width: 1500, height: 950 } });
   const adminPage = await actx.newPage();
-  await adminPage.goto(`http://127.0.0.1:${PORT}/admin`);
-  await adminPage.getByLabel('رمز الإدارة').fill(PIN);
-  await adminPage.getByRole('button', { name: 'اتصال', exact: true }).click();
+  await adminPage.goto(`http://127.0.0.1:${PORT}/admin${Q}`);
+  await adminPage.getByLabel(LANG === 'en' ? 'Admin PIN' : 'رمز الإدارة').fill(PIN);
+  await adminPage
+    .getByRole('button', { name: LANG === 'en' ? 'Connect' : 'اتصال', exact: true })
+    .click();
   await adminPage.waitForSelector('.round-hero');
   await shot(display, 'display-intro', 1800);
   await shot(player, 'player-code');
   await shot(adminPage, 'admin-idle');
-  for (const tab of ['bracket', 'teams', 'questions', 'setup', 'settings']) {
-    await adminPage
-      .getByRole('button', {
-        name: new RegExp(
-          {
-            bracket: 'شجرة',
-            teams: 'الفرق',
-            questions: 'بنك',
-            setup: 'الإعداد',
-            settings: 'الإعدادات',
-          }[tab]!,
-        ),
-      })
-      .first()
-      .click();
+  const nav = adminPage.locator('aside nav button');
+  for (const [tab, index] of [
+    ['bracket', 1],
+    ['teams', 2],
+    ['questions', 3],
+    ['setup', 4],
+    ['settings', 6],
+  ] as const) {
+    await nav.nth(index).click();
     await shot(adminPage, `admin-${tab}`, 600);
   }
-  await adminPage.getByRole('button', { name: /إدارة الجولة/ }).click();
+  await nav.nth(0).click();
 
   // ---- Stage 1, round 1 ----
   const snap = () => admin.snap;
@@ -172,7 +172,9 @@ async function run() {
       .first()
       .click();
   await shot(player, 'player-code-typed', 200);
-  await player.getByRole('button', { name: /دخول المسابقة/ }).click();
+  await player
+    .getByRole('button', { name: LANG === 'en' ? /Join the competition/ : /دخول المسابقة/ })
+    .click();
   await shot(player, 'player-welcome', 700);
   await bots[1].cmd('team.checkin', { code: codes[1] });
   await shot(display, 'display-lobby-partial', 1000);
@@ -289,7 +291,9 @@ async function run() {
             .locator('.keypad button', { hasText: new RegExp(`^${d}$`) })
             .first()
             .click();
-        await player.getByRole('button', { name: /دخول المسابقة/ }).click();
+        await player
+          .getByRole('button', { name: LANG === 'en' ? /Join the competition/ : /دخول المسابقة/ })
+          .click();
         await sleep(3000);
         await player.locator('.ready-orb').click({ force: true });
       } else {

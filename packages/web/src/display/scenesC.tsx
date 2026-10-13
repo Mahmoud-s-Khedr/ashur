@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ar as t } from '../../../shared/src/ar';
+import { t } from '../lib/i18n';
 import type { LineupTeam, Snapshot } from '../lib/types';
 import { type TeamFx, useCountUp } from '../lib/hooks';
 import { sfx } from '../lib/sfx';
