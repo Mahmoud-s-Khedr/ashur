@@ -28,6 +28,7 @@ export const DEFAULTS = {
   graceMs: 0,
   automation: 'auto' as 'auto' | 'assisted' | 'manual',
   sound: true,
+  liveScores: true,
   stage2Mapping: [
     [1, 2, 3, 4],
     [5, 6, 7, 8],

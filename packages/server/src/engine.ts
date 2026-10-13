@@ -159,6 +159,7 @@ export class Engine {
           rounds,
         };
     this.state.spinAt ??= 0;
+    this.state.settings.liveScores ??= true;
     this.state.allottedMs ??= this.state.elapsedMs + this.state.remainingMs;
     this.origin = this.clock();
     this.originElapsed = this.state.elapsedMs;
@@ -1110,7 +1111,9 @@ export class Engine {
           'Invalid reuse limit',
         );
         this.require(
-          typeof merged.sound === 'boolean' && typeof merged.unansweredWrong === 'boolean',
+          typeof merged.sound === 'boolean' &&
+            typeof merged.unansweredWrong === 'boolean' &&
+            typeof merged.liveScores === 'boolean',
           'Invalid boolean',
         );
         this.require(
@@ -1342,6 +1345,12 @@ export class Engine {
                   a.teamId === id && a.questionId === currentQuestionOf(id) && a.verdict !== 'void',
               ),
               bonus: scoreVisible ? bonusOf(id) : 0,
+              verdict:
+                reveal && s.phase !== 'RESULTS' && this.round.stage !== 1
+                  ? (s.answers.find(
+                      (a) => a.teamId === id && a.questionId === qId && a.verdict !== 'void',
+                    )?.verdict ?? null)
+                  : null,
               device: admin ? devices.find((d) => d.team_id === id) : undefined,
             })),
       ownScore: actor.role === 'team' && s.phase === 'RESULTS' && id ? scores[id] : null,
@@ -1363,6 +1372,7 @@ export class Engine {
       ...(admin
         ? {
             teams,
+            set: s.set,
             devices: this.db
               .prepare('SELECT id,role,team_id,seat_no,last_seen_at,rtt_ms FROM devices ORDER BY role,id')
               .all(),

@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "sim": "tsx tools/simulator.ts",
     "supervise": "node tools/supervise.mjs",
-    "smoke": "playwright test -c playwright.config.ts"
+    "smoke": "playwright test -c playwright.config.ts",
+    "tour": "tsx tools/tour.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
