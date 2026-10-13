@@ -37,8 +37,9 @@ export function TeamMark({
   size?: number;
   className?: string;
 }) {
-  const [broken, setBroken] = useState(false);
-  const logo = !!team.logoV && !broken;
+  const [broken, setBroken] = useState<string>('');
+  const logoKey = `${team.id}:${team.logoV}`;
+  const logo = !!team.logoV && broken !== logoKey;
   return (
     <span
       className={`team-mark ${logo ? 'has-logo' : ''} ${className}`}
@@ -49,7 +50,7 @@ export function TeamMark({
         <img
           src={`/logo/${team.id}?v=${team.logoV}`}
           alt=""
-          onError={() => setBroken(true)}
+          onError={() => setBroken(logoKey)}
           draggable={false}
         />
       ) : (

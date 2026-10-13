@@ -282,6 +282,9 @@ export function QuestionsTab({ s, send, bulk }: { s: Snapshot; send: Send; bulk:
       if (ids.length === 10) {
         send('set.build', { seq: set.seq, questionIds: ids });
         built++;
+        // set.build releases this set's surplus questions, so later sets may use them.
+        const chosen = new Set(ids);
+        for (const q of keep) if (!chosen.has(q.id)) byDiff[q.difficulty].push(q);
       }
     }
     if (!built) alert(t.autoFillNothing);
