@@ -254,12 +254,15 @@ export function GoFlash({ phase, stage }: { phase: string; stage: number }) {
   useEffect(() => {
     if (prev.current === 'COUNTDOWN' && phase !== 'COUNTDOWN') {
       setShow((x) => x + 1);
-      const id = setTimeout(() => setShow(0), 1200);
-      prev.current = phase;
-      return () => clearTimeout(id);
     }
     prev.current = phase;
   }, [phase]);
+  // The hide timer is tied to the flash itself, so later phase changes cannot cancel it.
+  useEffect(() => {
+    if (!show) return;
+    const id = setTimeout(() => setShow(0), 1200);
+    return () => clearTimeout(id);
+  }, [show]);
   if (!show) return null;
   return (
     <div className="go-flash" key={show} data-stage={stage}>

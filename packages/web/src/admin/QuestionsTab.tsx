@@ -269,15 +269,17 @@ export function QuestionsTab({ s, send, bulk }: { s: Snapshot; send: Send; bulk:
       if (set.ok) continue;
       const keep = set.qs.filter((q) => !q.used);
       const ids: number[] = [];
-      let possible = true;
+      const haveBy = Object.fromEntries(
+        DIFFS.map((d) => [d, keep.filter((q) => q.difficulty === d).slice(0, NEED[d])]),
+      );
+      // Preflight so an impossible set does not consume candidates later sets could use.
+      const possible = DIFFS.every((d) => NEED[d] - haveBy[d].length <= byDiff[d].length);
+      if (!possible) continue;
       for (const d of DIFFS) {
-        const have = keep.filter((q) => q.difficulty === d).slice(0, NEED[d]);
-        const missing = NEED[d] - have.length;
-        const extra = byDiff[d].splice(0, Math.max(0, missing));
-        if (extra.length < missing) possible = false;
-        ids.push(...have.map((q) => q.id), ...extra.map((q) => q.id));
+        const extra = byDiff[d].splice(0, NEED[d] - haveBy[d].length);
+        ids.push(...haveBy[d].map((q) => q.id), ...extra.map((q) => q.id));
       }
-      if (possible && ids.length === 10) {
+      if (ids.length === 10) {
         send('set.build', { seq: set.seq, questionIds: ids });
         built++;
       }
