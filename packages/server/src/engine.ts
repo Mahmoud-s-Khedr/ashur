@@ -731,8 +731,19 @@ export class Engine {
       }
       case 'cards.forceFill': {
         this.phase('CARD_PICK');
-        const lowest = Math.min(...s.settings.cards);
-        for (const id of this.round.teamIds) s.cards[id] ??= lowest;
+        for (const id of this.round.teamIds) {
+          if (s.cards[id]) continue;
+          // Same rule as card.select: never exceed the configured reuse limit.
+          const usable = [...s.settings.cards]
+            .sort((a, b) => a - b)
+            .find(
+              (v) =>
+                !s.settings.cardReuseLimit ||
+                (s.cardUses[id]?.[v] ?? 0) < s.settings.cardReuseLimit,
+            );
+          this.require(usable, 'A team has no card left within the reuse limit');
+          s.cards[id] = usable;
+        }
         this.schedule('question.start');
         break;
       }

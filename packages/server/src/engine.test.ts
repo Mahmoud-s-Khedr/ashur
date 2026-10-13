@@ -501,6 +501,17 @@ describe('presentation support', () => {
     engine.dispatch('question.start', {}, admin);
     expect(engine.state.phase).toBe('RUNNING');
   });
+  it('force-fill honours the card reuse limit', () => {
+    engine.dispatch('settings.update', { settings: { cardReuseLimit: 1 } }, admin);
+    start('2-1');
+    engine.dispatch('wheel.spin', {}, admin);
+    engine.state.cardUses = { 2: { 5: 1 }, 3: { 5: 1, 10: 1, 15: 1 } };
+    expect(() => engine.dispatch('cards.forceFill', {}, admin)).toThrow('reuse limit');
+    expect(engine.state.cards).toEqual({});
+    engine.state.cardUses = { 2: { 5: 1 } };
+    engine.dispatch('cards.forceFill', {}, admin);
+    expect(engine.state.cards).toEqual({ 1: 5, 2: 10, 3: 5, 4: 5 });
+  });
   it('applies a whole draw atomically and rejects duplicates', () => {
     const rows = Array.from({ length: 12 }, (_, i) => ({
       key: `1-${i + 1}`,

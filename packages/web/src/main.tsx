@@ -156,6 +156,7 @@ function App() {
               now={serverNow}
               error={c.error}
               clearError={() => c.setError('')}
+              connected={c.connected}
             />
           </ScreenGuard>
         </div>

@@ -177,7 +177,19 @@ function TimerBar({
   );
 }
 
-function Question({ s, send, remaining }: { s: Snapshot; send: Send; remaining: number }) {
+function Question({
+  s,
+  send,
+  remaining,
+  connected,
+  error,
+}: {
+  s: Snapshot;
+  send: Send;
+  remaining: number;
+  connected: boolean;
+  error: string;
+}) {
   const q = s.question!;
   const [text, setText] = useState('');
   const [sent, setSent] = useState<number | null>(null);
@@ -185,6 +197,10 @@ function Question({ s, send, remaining }: { s: Snapshot; send: Send; remaining: 
     setText('');
     setSent(null);
   }, [q.id]);
+  // An optimistic lock must not outlive a command the server never accepted.
+  useEffect(() => {
+    if (!connected || error) setSent(null);
+  }, [connected, error]);
   const c = s.settings;
   const locked = s.submitted || sent !== null;
   const total = s.stage === 1 ? c.blitzMs : c.questionMs;
@@ -378,6 +394,7 @@ export function Player({
   now,
   error,
   clearError,
+  connected,
 }: {
   s: Snapshot;
   send: Send;
@@ -385,6 +402,7 @@ export function Player({
   now: number;
   error: string;
   clearError: () => void;
+  connected: boolean;
 }) {
   const [welcome, setWelcome] = useState(false);
   const teamId = s.team?.id;
@@ -458,7 +476,7 @@ export function Player({
   else if (s.phase === 'COUNTDOWN') body = <Countdown remaining={remaining} />;
   else if (s.phase === 'CARD_PICK') body = <CardPick s={s} send={send} now={now} />;
   else if (s.question && ['RUNNING', 'TIE_RUNNING'].includes(s.phase))
-    body = <Question s={s} send={send} remaining={remaining} />;
+    body = <Question s={s} send={send} remaining={remaining} connected={connected} error={error} />;
   else if (blitzDone && s.phase === 'RUNNING') body = <Finished s={s} />;
   else if (s.phase === 'RESULTS') body = <Results s={s} />;
   else if (['AUDIENCE', 'REVEAL', 'REVIEW', 'TIE_REVIEW'].includes(s.phase))
