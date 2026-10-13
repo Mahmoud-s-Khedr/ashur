@@ -311,11 +311,14 @@ app.get('/api/results.csv', async (_, reply) => {
       'SELECT s.round_key,t.name,s.score FROM v_team_round_scores s JOIN teams t ON t.id=s.team_id ORDER BY s.round_key,s.score DESC',
     )
     .all() as any[];
+  // Gambler balances start from the configured initial balance (the ledger holds deltas only).
+  const initial = engine.state.settings.gamblerInitial;
+  const total = (r: any) => r.score + (String(r.round_key).startsWith('2-') ? initial : 0);
   const csv = (s: unknown) => '"' + String(s).replaceAll('"', '""') + '"';
   reply.header('Content-Type', 'text/csv; charset=utf-8');
   return (
     '\ufeffround,team,score\n' +
-    rows.map((r) => [r.round_key, r.name, r.score].map(csv).join(',')).join('\n')
+    rows.map((r) => [r.round_key, r.name, total(r)].map(csv).join(',')).join('\n')
   );
 });
 app.get('/api/audit.csv', async (_, reply) => {

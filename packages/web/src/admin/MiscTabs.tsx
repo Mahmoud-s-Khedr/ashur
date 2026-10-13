@@ -61,8 +61,11 @@ async function printResults() {
     `${[t.blitz, t.gambler, t.climb][r.stage - 1]}${r.stage === 3 ? '' : ` · ${r.stage === 2 ? t.groupLabel : t.round} ${r.seq}`}`;
   const tables = rounds
     .map((r) => {
+      // The ledger stores deltas; Stage 2 balances also include the configured starting balance.
+      const base = r.stage === 2 ? data.state.settings.gamblerInitial : 0;
       const rows = data.scores
         .filter((x: any) => x.round_key === r.key)
+        .map((x: any) => ({ ...x, score: x.score + base }))
         .sort((a: any, b: any) => b.score - a.score);
       return `<h2>${esc(label(r))}</h2><table><thead><tr><th>${esc(t.rankWord)}</th><th>${esc(t.team)}</th><th>${esc(t.score)}</th><th></th></tr></thead><tbody>${rows
         .map(

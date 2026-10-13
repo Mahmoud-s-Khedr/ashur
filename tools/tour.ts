@@ -353,7 +353,7 @@ async function run() {
       await player.locator('.opt').first().click({ force: true });
     else {
       await player.locator('textarea').fill('ok');
-      await player.getByRole('button', { name: /إرسال/ }).click();
+      await player.getByRole('button', { name: /إرسال|Submit/ }).click();
     }
   };
   const gradeAll = async (correctIdx: number[]) => {
