@@ -534,6 +534,22 @@ describe('presentation support', () => {
     ).toThrow('twice');
     expect(JSON.stringify(engine.state.rounds)).toBe(before);
   });
+  it('rejects the same round key twice in one draw', () => {
+    const before = JSON.stringify(engine.state.rounds);
+    expect(() =>
+      engine.dispatch(
+        'bracket.bulk',
+        {
+          assignments: [
+            { key: '1-1', teamIds: [1, 2, 3, 4] },
+            { key: '1-1', teamIds: [5, 6, 7, 8] },
+          ],
+        },
+        admin,
+      ),
+    ).toThrow('twice');
+    expect(JSON.stringify(engine.state.rounds)).toBe(before);
+  });
   it('rejects a partial draw that duplicates a team from an untouched round', () => {
     const before = JSON.stringify(engine.state.rounds);
     // team 5 already sits in round 1-2 which is not part of this submission

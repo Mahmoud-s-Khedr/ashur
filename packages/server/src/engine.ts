@@ -607,6 +607,10 @@ export class Engine {
       }
       case 'bracket.bulk': {
         this.phase('IDLE', 'RULES', 'HANDSHAKE');
+        this.require(
+          new Set(p.assignments.map((a: any) => a.key)).size === p.assignments.length,
+          'A round appears twice in the draw',
+        );
         const all = this.teams();
         const seen = new Set<number>();
         for (const a of p.assignments) {
