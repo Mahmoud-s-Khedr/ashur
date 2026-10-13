@@ -358,6 +358,7 @@ export const en: Record<keyof typeof ar, string> = {
   waitReadyHint: 'Waiting for every team to be ready',
   withinWord: 'within',
   ofWord: 'of',
+  reconnecting: 'Lost connection to the server, reconnecting…',
   recovering: 'Restoring the screen…',
   tieQuestionPick: 'Tie-breaker question',
   tieQuestionAuto: 'Automatic (first available)',
@@ -427,4 +428,13 @@ export const ackLabelsEn: Record<string, string> = {
   'automation.set': 'Mode changed',
   'round.select': 'Round selected',
   'question.reroll': 'Category re-picked',
+};
+
+export const autoLabelsEn: Record<string, string> = {
+  'round.start': 'Start the round',
+  'question.start': 'Start the question and timer',
+  'question.reveal': 'Reveal the answer',
+  'question.next': 'Next question',
+  'wheel.spin': 'Spin the wheel',
+  'tiebreak.launch': 'Launch the tie-breaker',
 };

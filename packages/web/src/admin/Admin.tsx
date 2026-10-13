@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { t, phaseNames, lang, switchLang } from '../lib/i18n';
+import { t, phaseNames, autoLabels, lang, switchLang } from '../lib/i18n';
 import type { Bulk, Send, Snapshot } from '../lib/types';
 import { ToastStack, TimerRing } from '../ui/parts';
 import { stageName } from './common';
@@ -147,7 +147,7 @@ export function Admin({
             </TimerRing>
             <span>
               {t.autoIn} <b className="num">{Math.max(0, Math.ceil((s.autoAt - now) / 1000))}</b>{' '}
-              {t.seconds} · <code>{s.autoAction}</code>
+              {t.seconds} · <b>{autoLabels[s.autoAction] ?? s.autoAction}</b>
             </span>
             <button onClick={() => send('auto.cancel')}>{t.cancelAuto}</button>
           </div>

@@ -1,5 +1,10 @@
-import { ar, phaseNames as phaseNamesAr, ackLabels as ackLabelsAr } from '../../../shared/src/ar';
-import { en, phaseNamesEn, ackLabelsEn } from '../../../shared/src/en';
+import {
+  ar,
+  phaseNames as phaseNamesAr,
+  ackLabels as ackLabelsAr,
+  autoLabels as autoLabelsAr,
+} from '../../../shared/src/ar';
+import { en, phaseNamesEn, ackLabelsEn, autoLabelsEn } from '../../../shared/src/en';
 
 export type Lang = 'ar' | 'en';
 
@@ -24,6 +29,7 @@ export const arrow = dir === 'rtl' ? '←' : '→';
 export const t: typeof ar = lang === 'en' ? (en as typeof ar) : ar;
 export const phaseNames = lang === 'en' ? phaseNamesEn : phaseNamesAr;
 export const ackLabels = lang === 'en' ? ackLabelsEn : ackLabelsAr;
+export const autoLabels = lang === 'en' ? autoLabelsEn : autoLabelsAr;
 
 export function switchLang(next: Lang) {
   try {

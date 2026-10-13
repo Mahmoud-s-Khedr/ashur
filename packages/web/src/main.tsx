@@ -36,6 +36,7 @@ function App() {
     document.documentElement.lang = lang;
     document.documentElement.dir = dir;
     document.title = t.title;
+    document.documentElement.classList.toggle('low-fx', lowFx);
     document.documentElement.classList.toggle('display-page', path === '/display');
     document.documentElement.classList.toggle('play-page', path === '/play');
   }, [path]);
@@ -89,12 +90,19 @@ function App() {
   const remaining = s ? (s.paused ? s.remainingMs : Math.max(0, s.endsAt - serverNow)) : 0;
   // Check-in problems are shown inside the keypad; only other errors use the global banner.
   const inlineError = role === 'team' && !s?.team;
+  const lowFx = new URLSearchParams(location.search).get('fx') === 'low';
   return (
     <div className={`app ${role}`}>
       <div className={`connection ${c.connected ? '' : 'disconnected'}`}>
         <span className="dot" />
         {c.connected ? t.online : t.offline}
       </div>
+      {s && !c.connected && role !== 'admin' && (
+        <div className="reconnect-banner" role="status">
+          <span className="pulse" />
+          {t.reconnecting}
+        </div>
+      )}
       {c.error && !inlineError && (
         <div className="error" role="alert">
           {c.error}

@@ -17,7 +17,9 @@
     "sim": "tsx tools/simulator.ts",
     "supervise": "node tools/supervise.mjs",
     "smoke": "playwright test -c playwright.config.ts",
-    "tour": "tsx tools/tour.ts"
+    "tour": "tsx tools/tour.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",

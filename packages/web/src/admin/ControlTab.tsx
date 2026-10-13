@@ -107,7 +107,10 @@ function Stepper({ s }: { s: Snapshot }) {
 
 function TeamCard({ s, team, i, send }: { s: Snapshot; team: LineupTeam; i: number; send: Send }) {
   const answers = (s.answers ?? [])
-    .filter((a: any) => a.teamId === team.id && a.verdict !== 'void')
+    .filter(
+      (a: any) =>
+        a.teamId === team.id && a.verdict !== 'void' && (s.set ?? []).includes(a.questionId),
+    )
     .sort((a: any, b: any) => a.elapsedUs - b.elapsedUs);
   const online = !!team.device && team.device.last_seen_at > s.serverNow - 6000;
   const status = team.ready ? 'ready' : team.checkedIn ? 'in' : 'wait';
@@ -152,13 +155,13 @@ function TeamCard({ s, team, i, send }: { s: Snapshot; team: LineupTeam; i: numb
             )}
           </div>
         </>
-      ) : (
+      ) : s.stage === 2 ? (
         <div className="mini-stats">
           <span>
             {t.card} <b className="num">{team.card ?? '—'}</b>
           </span>
         </div>
-      )}
+      ) : null}
       <div className="device-row">
         <span className={`dot ${online ? '' : 'off'}`} />
         <span>

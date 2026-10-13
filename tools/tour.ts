@@ -111,7 +111,10 @@ async function main() {
 async function run() {
   const admin = new Client('admin', 'tour-admin-device');
   await admin.connect();
-  await admin.cmd('settings.update', { settings: { automation: 'manual', countdownMs: 3000 } });
+  const AUTO = process.env.TOUR_AUTO === '1';
+  await admin.cmd('settings.update', {
+    settings: { automation: AUTO ? 'auto' : 'manual', countdownMs: 3000, autoDelayMs: 4000 },
+  });
   const bots = [1, 2, 3, 4].map((i) => new Client('team', `tour-bot-device-${i}`));
   await Promise.all(bots.map((b) => b.connect()));
   const executablePath =
@@ -189,14 +192,15 @@ async function run() {
   await bots[3].cmd('team.ready');
   await shot(display, 'display-lobby-all-ready', 900);
   await shot(adminPage, 'admin-ready', 200);
-  await admin.cmd('round.start');
-  await shot(display, 'display-countdown', 1200);
+  if (!AUTO) await admin.cmd('round.start');
+  await shot(display, 'display-countdown', AUTO ? 5200 : 1200);
   await shot(player, 'player-countdown', 100);
   await admin.until((s) => s.phase === 'RUNNING', 6000);
   await sleep(300);
   // bots answer with different skill / speed
   // deterministic mistakes so every run tells the same story
-  const wrongAt = [[], [2, 6], [1, 3, 5, 8], [0, 2, 3, 4, 6, 7, 9]];
+  const TIE = process.env.TOUR_SCENARIO === 'tie';
+  const wrongAt = TIE ? [[], [], [], []] : [[], [2, 6], [1, 3, 5, 8], [0, 2, 3, 4, 6, 7, 9]];
   const speed = [650, 800, 950, 1300];
   const playing = bots.map(async (bot, i) => {
     for (let q = 0; q < 10; q++) {
@@ -232,6 +236,39 @@ async function run() {
   await shot(display, 'display-race-end', 1200);
   await shot(player, 'player-finished', 100);
   await admin.until((s) => ['REVIEW', 'RESULTS'].includes(s.phase), 6000);
+  if (TIE) {
+    // Everyone answered everything correctly in the same bonus tier: a four-way tie for first.
+    await admin.until((x) => x.phase === 'REVIEW' && x.tieIds.length > 1, 4000);
+    await shot(display, 'display-tie', 2200);
+    await shot(adminPage, 'admin-tie', 200);
+    await admin.cmd('tiebreak.open');
+    await shot(display, 'display-tie-lobby', 1200);
+    await player.locator('.ready-orb').click({ force: true });
+    for (const b of bots.slice(1)) await b.cmd('team.ready');
+    await shot(display, 'display-tie-lobby-ready', 900);
+    await shot(adminPage, 'admin-tie-ready', 100);
+    await admin.cmd('tiebreak.launch');
+    await shot(display, 'display-tie-duel', 1500);
+    await player.waitForSelector('.text-answer textarea');
+    await shot(player, 'player-tie-question', 200);
+    await player.locator('textarea').fill('2');
+    await player.getByRole('button', { name: /إرسال|Submit/ }).click();
+    for (const [i, b] of bots.slice(1).entries()) {
+      await sleep(300 + i * 250);
+      const q = (await b.until((x) => !!x.question && !x.submitted, 3000)).question;
+      await b.cmd('answer.submit', { roundQuestionId: q.id, answer: '2' });
+    }
+    await admin.until((x) => x.phase === 'TIE_REVIEW', 4000);
+    await shot(display, 'display-tie-judging', 1200);
+    await shot(adminPage, 'admin-tie-grading', 200);
+    for (const a of admin.snap.answers.filter((a: any) => a.verdict === 'pending'))
+      await admin.cmd('grade.set', { answerId: a.id, verdict: 'correct' });
+    await admin.cmd('question.reveal');
+    await admin.until((x) => x.phase === 'RESULTS', 4000);
+    await shot(display, 'display-tie-winner', 2500);
+    await browser.close();
+    return;
+  }
   await shot(display, 'display-results-blitz', 2500);
   await shot(player, 'player-results', 100);
   await shot(adminPage, 'admin-results', 100);

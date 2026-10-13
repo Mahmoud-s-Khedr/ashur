@@ -350,6 +350,7 @@ export const ar = {
   waitReadyHint: 'بانتظار جاهزية كل الفرق',
   withinWord: 'خلال',
   ofWord: 'من',
+  reconnecting: 'انقطع الاتصال بالخادم، جارٍ إعادة الاتصال…',
   recovering: 'جارٍ استعادة الشاشة…',
   tieQuestionPick: 'سؤال كسر التعادل',
   tieQuestionAuto: 'تلقائي (أول سؤال متاح)',
@@ -419,4 +420,14 @@ export const ackLabels: Record<string, string> = {
   'automation.set': 'تغيّر نمط التشغيل',
   'round.select': 'اختيرت الجولة',
   'question.reroll': 'أُعيد اختيار المجال',
+};
+
+/** What an automatic step is about to do (shown in the countdown banner). */
+export const autoLabels: Record<string, string> = {
+  'round.start': 'بدء الجولة',
+  'question.start': 'بدء السؤال والمؤقت',
+  'question.reveal': 'إظهار الإجابة',
+  'question.next': 'السؤال التالي',
+  'wheel.spin': 'تدوير العجلة',
+  'tiebreak.launch': 'إطلاق سؤال كسر التعادل',
 };

@@ -163,7 +163,7 @@
   border: 1px solid var(--gold);
   animation: slide-up 0.3s var(--ease);
 }
-.auto-banner code {
+.auto-banner b:not(.num) {
   color: var(--gold);
 }
 .auto-banner button {

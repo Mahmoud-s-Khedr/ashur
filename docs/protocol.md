@@ -28,14 +28,14 @@ Clock synchronization: `time.ping {c0}` returns `time.pong {c0,s1}`. The client 
 
 Commands implemented:
 
-| Role  | Commands                                                                                                                                                                                         |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Team  | `team.checkin {code}`, `team.checkout`, `team.ready`, `answer.submit {roundQuestionId,answer}`, `card.select {value}`                                                                            |
-| Admin | `round.select {key}`, `round.assignTeams {teamIds}`, `round.showRules`, `lineup.announce`, `round.openHandshake`, `round.start`, `round.forceStart`, `round.pause`, `round.resume`, `round.next` |
-| Admin | `automation.set {mode}`, `auto.cancel`, `wheel.spin`, `question.start`, `question.reroll`, `question.next`, `question.reveal`, `question.cancelLeak {questionId?,replacementId?}`                |
-| Admin | `grade.set {answerId,verdict}`, `score.adjust {teamId,delta,reason}`, `undo.last`, `tiebreak.open`, `tiebreak.launch {questionId?}`                                                              |
-| Admin | `checkin.kick {teamId}`, `devices.reset`, `bracket.override {key,teamIds}`, `bracket.bulk {assignments:[{key,teamIds}]}` (atomic draw), `cards.forceFill`, `display.scene {scene}`, `settings.update {settings}` |
-| Admin | `teams.save {teams}` (each team may carry `logo`: a PNG/JPEG/WebP data URL ≤ 400 KB, or `null` to remove), `teams.delete {id}`, `questions.save {questions}`, `questions.delete {id}`, `questions.resetUsed`, `set.build {seq,questionIds}`                                           |
+| Role  | Commands                                                                                                                                                                                                                                    |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Team  | `team.checkin {code}`, `team.checkout`, `team.ready`, `answer.submit {roundQuestionId,answer}`, `card.select {value}`                                                                                                                       |
+| Admin | `round.select {key}`, `round.assignTeams {teamIds}`, `round.showRules`, `lineup.announce`, `round.openHandshake`, `round.start`, `round.forceStart`, `round.pause`, `round.resume`, `round.next`                                            |
+| Admin | `automation.set {mode}`, `auto.cancel`, `wheel.spin`, `question.start`, `question.reroll`, `question.next`, `question.reveal`, `question.cancelLeak {questionId?,replacementId?}`                                                           |
+| Admin | `grade.set {answerId,verdict}`, `score.adjust {teamId,delta,reason}`, `undo.last`, `tiebreak.open`, `tiebreak.launch {questionId?}`                                                                                                         |
+| Admin | `checkin.kick {teamId}`, `devices.reset`, `bracket.override {key,teamIds}`, `bracket.bulk {assignments:[{key,teamIds}]}` (atomic draw), `cards.forceFill`, `display.scene {scene}`, `settings.update {settings}`                            |
+| Admin | `teams.save {teams}` (each team may carry `logo`: a PNG/JPEG/WebP data URL ≤ 400 KB, or `null` to remove), `teams.delete {id}`, `questions.save {questions}`, `questions.delete {id}`, `questions.resetUsed`, `set.build {seq,questionIds}` |
 
 Text/numeric `answer` is a string; MCQ `answer` is a zero-based index. `roundQuestionId` refers to the question's stable ID. A cancelled question's replacement receives a different ID. A previously used question cannot appear in a different round. One non-void submission is accepted per team/question in that round.
 
@@ -52,7 +52,6 @@ HTTP:
 - `GET /logo/:teamId?v=<n>`: public team logo bytes with immutable caching (the version comes from the snapshot's `logoV`).
 
 All `/api/*` requests require `Authorization: Bearer <admin device token>`. Static pages and locally bundled assets are served by the same port. Each socket is limited to 100 incoming messages per second; five failed code attempts lock that device for ten seconds, and five bad PIN attempts lock the source IP for ten seconds.
-
 
 ## Snapshot fields added for presentation
 
