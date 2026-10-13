@@ -83,7 +83,9 @@ export function BracketTab({ s, send }: { s: Snapshot; send: Send }) {
             dirty={dirty}
             compact
             onSelect={
-              editable || s.phase === 'RESULTS' ? (key) => send('round.select', { key }) : undefined
+              ['IDLE', 'RESULTS'].includes(s.phase)
+                ? (key) => send('round.select', { key })
+                : undefined
             }
             onSwap={editable ? swap : undefined}
           />

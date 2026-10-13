@@ -237,6 +237,9 @@ export function Leaderboard({
   remaining: number;
   unit: number;
 }) {
+  // The operator's hidden-scores setting also covers the manual leaderboard scene.
+  const live =
+    s.stage !== 1 || s.settings.liveScores || !['COUNTDOWN', 'RUNNING'].includes(s.phase);
   const qualified = s.rounds
     .filter((r) => r.completed && r.winner)
     .map((r) => ({ round: r, team: r.teams.find((x) => x.id === r.winner)! }))
@@ -253,7 +256,7 @@ export function Leaderboard({
             <RingTimer s={s} remaining={remaining} unit={unit} size={7} />
           )}
         </header>
-        <Lanes s={s} fx={fx} mode={s.stage === 1 ? 'blitz' : 'balance'} live />
+        <Lanes s={s} fx={fx} mode={s.stage === 1 ? 'blitz' : 'balance'} live={live} />
       </div>
       <aside className="lb-side">
         <h2>

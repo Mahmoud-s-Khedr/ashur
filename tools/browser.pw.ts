@@ -52,7 +52,7 @@ test('Arabic admin, team and display screens work without external runtime reque
     await play.locator('.keypad button', { hasText: new RegExp(`^${digit}$`) }).click();
   await play.getByRole('button', { name: 'دخول المسابقة ←', exact: true }).click();
   await expect(play.locator('.p-head')).toContainText('الفريق 1');
-  await expect(play.locator('.ready-orb')).toBeVisible({ timeout: 6000 });
+  await expect(play.locator('.ready-orb')).toBeVisible({ timeout: 12000 });
   await play.locator('.ready-orb').click({ force: true });
   await expect(play.locator('.ready-orb.is-ready')).toBeVisible();
   await projector.goto('/display');

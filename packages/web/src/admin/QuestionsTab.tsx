@@ -295,7 +295,9 @@ export function QuestionsTab({ s, send, bulk }: { s: Snapshot; send: Send; bulk:
       <div className="notice warning">{t.demoWarning}</div>
       <div className="coverage-grid">
         {coverage.map(([st, required]) => {
-          const count = questions.filter((q) => q.stage === st && !q.used).length;
+          const count = questions.filter(
+            (q) => q.stage === st && !q.used && (st ? q.pool === 'main' : q.pool !== 'main'),
+          ).length;
           return (
             <div
               className={`panel cover ${count >= required ? 'full' : 'missing'}`}
