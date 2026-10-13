@@ -43,6 +43,26 @@ export function useCountUp(target: number, durationMs = 700) {
   return shown;
 }
 
+/**
+ * Classify a team's change between two snapshots. Pure so the streak rules are testable:
+ * in Blitz every submitted answer counts (a wrong easy answer scores 0 yet breaks a streak),
+ * and speed-bonus points never make a wrong final answer look right.
+ */
+export function classifyChange(
+  stage: number,
+  before: Pick<LineupTeam, 'score' | 'progress' | 'bonus'>,
+  after: Pick<LineupTeam, 'score' | 'progress' | 'bonus'>,
+): 'correct' | 'wrong' | null {
+  if (before.score === null || after.score === null) return null;
+  if (stage === 1) {
+    if (after.progress <= before.progress) return null;
+    const base = after.score - after.bonus - (before.score - before.bonus);
+    return base > 0 ? 'correct' : 'wrong';
+  }
+  const delta = after.score - before.score;
+  return delta > 0 ? 'correct' : delta < 0 ? 'wrong' : null;
+}
+
 export type TeamFx = {
   /** points gained/lost on the latest scoring event, cleared after a while */
   delta: number;
@@ -100,19 +120,14 @@ export function useTeamEffects(s: Snapshot | null, onEvent?: (e: DisplayEvent) =
       const before = last.current.teams[team.id];
       if (!before || before.score === null || team.score === null) continue;
       const delta = team.score - before.score;
-      if (delta === 0 && team.progress === before.progress) continue;
-      if (delta === 0) continue;
-      const baseDelta = team.score - team.bonus - (before.score - before.bonus);
-      if (s.stage === 1 && team.progress > before.progress) {
-        if (baseDelta > 0) {
+      const verdict = classifyChange(s.stage, before, team);
+      if (!verdict && delta === 0) continue;
+      if (verdict && s.stage === 1) {
+        if (verdict === 'correct') {
           streaks.current[team.id] = (streaks.current[team.id] ?? 0) + 1;
-          cb.current?.({ kind: 'correct', team, id: ++counter.current });
           const n = streaks.current[team.id];
           if (n >= 3) cb.current?.({ kind: 'streak', team, count: n, id: ++counter.current });
-        } else {
-          streaks.current[team.id] = 0;
-          cb.current?.({ kind: 'wrong', team, id: ++counter.current });
-        }
+        } else streaks.current[team.id] = 0;
         if (team.bonus > before.bonus)
           cb.current?.({
             kind: 'bonus',
@@ -120,9 +135,8 @@ export function useTeamEffects(s: Snapshot | null, onEvent?: (e: DisplayEvent) =
             points: team.bonus - before.bonus,
             id: ++counter.current,
           });
-      } else if (s.stage !== 1) {
-        cb.current?.({ kind: delta > 0 ? 'correct' : 'wrong', team, id: ++counter.current });
       }
+      if (verdict) cb.current?.({ kind: verdict, team, id: ++counter.current });
       changes[team.id] = {
         delta,
         move: (last.current.ranks[team.id] ?? 0) - (ranking[team.id] ?? 0),

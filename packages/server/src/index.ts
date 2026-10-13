@@ -318,6 +318,23 @@ app.get('/api/results.csv', async (_, reply) => {
     rows.map((r) => [r.round_key, r.name, r.score].map(csv).join(',')).join('\n')
   );
 });
+app.get('/api/audit.csv', async (_, reply) => {
+  const rows = db
+    .prepare('SELECT id,at_wall_ms,actor,type,payload_json FROM event_log ORDER BY id')
+    .all() as any[];
+  const csv = (v: unknown) => '"' + String(v).replaceAll('"', '""') + '"';
+  reply.header('Content-Type', 'text/csv; charset=utf-8');
+  return (
+    '\ufeffid,time,actor,event,details\n' +
+    rows
+      .map((r) =>
+        [r.id, new Date(r.at_wall_ms).toISOString(), r.actor, r.type, r.payload_json]
+          .map(csv)
+          .join(','),
+      )
+      .join('\n')
+  );
+});
 const backupDir = resolve(process.env.BACKUP_DIR || 'backups');
 let backingUp = false;
 async function backup() {
