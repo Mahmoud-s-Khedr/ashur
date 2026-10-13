@@ -10,6 +10,8 @@ class Sfx {
   private master: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   enabled = false;
+  /** Operator setting: when true nothing plays even if this device enabled sound. */
+  muted = false;
   volume = 0.7;
 
   enable() {
@@ -88,7 +90,7 @@ class Sfx {
   }
 
   play(name: SfxName, arg = 0) {
-    if (!this.enabled || !this.ctx) return;
+    if (!this.enabled || this.muted || !this.ctx) return;
     switch (name) {
       case 'tick':
         this.tone(1400, 0, 0.04, 'square', 0.06);

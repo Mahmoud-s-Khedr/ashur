@@ -33,6 +33,7 @@ function useUnit() {
 
 export function Display({ s, remaining, now }: { s: Snapshot; remaining: number; now: number }) {
   const unit = useUnit();
+  sfx.muted = !s.settings.sound;
   const { toasts, push } = useToasts(3000, 2);
   const [soundOn, setSoundOn] = useState(false);
   const [idle, setIdle] = useState(false);

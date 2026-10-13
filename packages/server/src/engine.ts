@@ -1251,7 +1251,7 @@ export class Engine {
     const admin = actor.role === 'admin';
     const teams = this.teams();
     const safeTeam = (t: Team) =>
-      admin ? t : { id: t.id, name: t.name, color: t.color, status: t.status };
+      admin ? t : { id: t.id, name: t.name, color: t.color, status: t.status, logoV: t.logoV };
     const qId =
       s.tieQuestion ?? (this.round.stage === 1 ? s.set[s.progress[id ?? 0] ?? 0] : s.set[s.index]);
     const q = this.question(qId);

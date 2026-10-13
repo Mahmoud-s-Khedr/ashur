@@ -424,7 +424,13 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
     }
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [pending.map((a: any) => a.id).join(','), action?.cmd, action?.disabled, send]);
+  }, [
+    pending.map((a: any) => a.id).join(','),
+    action?.cmd,
+    action?.disabled,
+    JSON.stringify(action?.payload),
+    send,
+  ]);
   const winner = s.lineup.find((x) => x.id === s.winner);
   return (
     <div className="control-grid">

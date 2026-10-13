@@ -531,6 +531,9 @@ describe('presentation support', () => {
     );
     expect(engine.logo(1)?.logo_mime).toBe('image/png');
     expect(engine.teams()[0].logoV).toBe(1);
+    const pub: any = engine.snapshot({ role: 'display', deviceId: 'd' });
+    expect(pub.lineup[0].logoV).toBe(1);
+    expect(pub.rounds[0].teams[0].logoV).toBe(1);
     expect(JSON.stringify(engine.snapshot({ role: 'display', deviceId: 'd' }))).not.toContain(
       'base64',
     );

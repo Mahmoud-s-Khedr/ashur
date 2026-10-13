@@ -90,7 +90,7 @@ function App() {
     );
   const remaining = s ? (s.paused ? s.remainingMs : Math.max(0, s.endsAt - serverNow)) : 0;
   // Check-in problems are shown inside the keypad; only other errors use the global banner.
-  const inlineError = role === 'team' && !s?.team;
+  const inlineError = role === 'team' && !!s && !s.team;
   return (
     <div className={`app ${role}`}>
       <div className={`connection ${c.connected ? '' : 'disconnected'}`}>
