@@ -1,0 +1,12 @@
+import {z} from 'zod';
+export * from './constants';
+export * from './scoring';
+export const envelope=z.object({v:z.literal(1),type:z.string().max(80),cmdId:z.string().min(1).max(100).optional(),payload:z.record(z.unknown()).default({})});
+export const questionSchema=z.object({id:z.number().int().positive().optional(),stage:z.number().int().min(1).max(3).nullable(),pool:z.enum(['main','reserve','tiebreaker']),difficulty:z.enum(['easy','medium','hard','joker']),category:z.string().min(1).max(100),type:z.enum(['mcq','text','numeric']),body:z.string().min(1).max(4000),options:z.array(z.string().max(1000)).max(8).default([]),correct:z.union([z.number().int().nonnegative(),z.array(z.string().max(1000)).min(1)]),explanation:z.string().max(4000).default(''),setNo:z.number().int().positive().nullable().default(null)}).superRefine((q,ctx)=>{if(q.type==='mcq'&&(!Number.isInteger(q.correct)||typeof q.correct!=='number'||q.correct>=q.options.length||q.options.length<2))ctx.addIssue({code:'custom',message:'MCQ needs options and a valid zero-based correct index'});if(q.type!=='mcq'&&!Array.isArray(q.correct))ctx.addIssue({code:'custom',message:'Text/numeric needs accepted answers'});if(q.stage===1&&q.type!=='mcq')ctx.addIssue({code:'custom',message:'Blitz requires MCQ'});});
+export type Question=z.infer<typeof questionSchema>&{id:number;used?:boolean;deleted?:boolean};
+export type Team={id:number;code:string;name:string;color:string;status:string};
+export type Answer={id:string;teamId:number;questionId:number;answer:number|string|null;elapsedUs:number;wallMs:number;rttMs:number|null;verdict:'correct'|'wrong'|'pending'|'void';scored:boolean};
+export type Role='admin'|'display'|'team';
+export type Phase='IDLE'|'RULES'|'HANDSHAKE'|'COUNTDOWN'|'RUNNING'|'WHEEL'|'CARD_PICK'|'AUDIENCE'|'REVEAL'|'REVIEW'|'RESULTS'|'TIE_READY'|'TIE_RUNNING'|'TIE_REVIEW';
+export type Round={key:string;stage:number;seq:number;teamIds:number[];winner?:number;completed?:boolean};
+export type Match={version:number;roundKey:string;phase:Phase;scene:string;ready:number[];set:number[];index:number;progress:Record<number,number>;cards:Record<number,number>;cardUses:Record<number,Record<number,number>>;category:string;answers:Answer[];startedAt:number;endsAt:number;remainingMs:number;elapsedMs:number;paused:boolean;autoAt:number;autoAction:string;winner?:number;tieIds:number[];tieQuestion?:number;finishMs:Record<number,number>;settings:import('./constants').Settings;rounds:Round[]};

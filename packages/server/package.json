@@ -1,0 +1,1 @@
+{"name":"@ashour/server","private":true,"type":"module","scripts":{"dev":"tsx watch src/index.ts"},"dependencies":{"@ashour/shared":"workspace:*","fastify":"^5.0.0","@fastify/static":"^8.0.0","better-sqlite3":"^12.0.0","ws":"^8.18.0","zod":"^3.24.0","dotenv":"^16.4.0"},"devDependencies":{"@types/better-sqlite3":"^7.6.0","@types/ws":"^8.5.0"}}
