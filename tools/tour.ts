@@ -388,7 +388,9 @@ async function run() {
       }
       const cards = [15, 10, 5, 10];
       if (detailed) {
-        await sleep(det ? 600 : 5600);
+        // The cards only appear once the reel has stopped (team screens hold the category back).
+        await player.locator('.wager-pick').first().waitFor({ timeout: 12000 });
+        await sleep(det ? 200 : 900); // let the flip-in finish
         await player
           .locator('.wager-pick')
           .nth(2)
