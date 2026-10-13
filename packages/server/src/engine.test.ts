@@ -534,6 +534,30 @@ describe('presentation support', () => {
     ).toThrow('twice');
     expect(JSON.stringify(engine.state.rounds)).toBe(before);
   });
+  it('rejects a partial draw that duplicates a team from an untouched round', () => {
+    const before = JSON.stringify(engine.state.rounds);
+    // team 5 already sits in round 1-2 which is not part of this submission
+    expect(() =>
+      engine.dispatch(
+        'bracket.bulk',
+        { assignments: [{ key: '1-1', teamIds: [5, 2, 3, 4] }] },
+        admin,
+      ),
+    ).toThrow('twice');
+    expect(JSON.stringify(engine.state.rounds)).toBe(before);
+    // a swap between two rounds is still fine
+    engine.dispatch(
+      'bracket.bulk',
+      {
+        assignments: [
+          { key: '1-1', teamIds: [5, 2, 3, 4] },
+          { key: '1-2', teamIds: [1, 6, 7, 8] },
+        ],
+      },
+      admin,
+    );
+    expect(engine.state.rounds[1].teamIds).toEqual([1, 6, 7, 8]);
+  });
   it('stores team logos outside snapshots and versions them', () => {
     engine.dispatch(
       'teams.save',

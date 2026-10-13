@@ -623,6 +623,16 @@ export class Engine {
             seen.add(id);
           }
         }
+        // Validate the whole resulting stage, not just the submitted rounds: a partial draw
+        // must not duplicate a team that sits in an untouched round.
+        for (const stage of new Set(
+          p.assignments.map((a: any) => s.rounds.find((r) => r.key === a.key)!.stage),
+        )) {
+          const ids = s.rounds
+            .filter((r) => r.stage === stage)
+            .flatMap((r) => p.assignments.find((a: any) => a.key === r.key)?.teamIds ?? r.teamIds);
+          this.require(new Set(ids).size === ids.length, 'A team appears twice in the draw');
+        }
         for (const a of p.assignments) {
           const r = s.rounds.find((r) => r.key === a.key)!;
           r.teamIds = a.teamIds;

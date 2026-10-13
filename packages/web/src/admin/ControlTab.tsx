@@ -267,7 +267,9 @@ function Emergency({ s, send }: { s: Snapshot; send: Send }) {
   const [leakQ, setLeakQ] = useState('');
   const [replacement, setReplacement] = useState('');
   const questions: Question[] = s.questions ?? [];
-  const reserve = questions.filter((q) => q.pool === 'reserve' && !q.used);
+  const reserve = questions.filter(
+    (q) => q.pool === 'reserve' && !q.used && (s.stage !== 1 || q.type === 'mcq'),
+  );
   const setQs = (s.set ?? [])
     .map((id, i) => ({ q: questions.find((q) => q.id === id), i }))
     .filter((x) => x.q);
