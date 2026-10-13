@@ -4,11 +4,22 @@
 
 1. Install dependencies, build the app, create `.env` with a private `ADMIN_PIN`, and start the server as described in the README.
 2. Reserve the server's router IP. Connect admin, projector and four competitor computers by Ethernet. Disable sleep, screensavers and automatic updates on these computers.
-3. Open `/admin` and enter the PIN. Open `/play` on each competitor computer and `/display` on the projector. Use one browser tab per device. Click **تفعيل الصوت** on the projector once. Optional: click **ملء الشاشة**, or use browser kiosk/fullscreen mode.
+3. Open `/admin` and enter the PIN. Open `/play` on each competitor computer and `/display` on the projector. Use one browser tab per device. The **الإعداد والأجهزة** tab shows QR codes and URLs for all three routes, a pre-show checklist and a live device table (role, team, seat, RTT). Click **تفعيل الصوت** on the projector once (browsers require a click before any sound); click **ملء الشاشة** or use kiosk mode. The projector hides its controls and the mouse cursor after four idle seconds. For an English interface add `?lang=en` to any URL, or use the language button in the console sidebar. On a weak projector computer open `/display?fx=low` to turn off the heaviest background effects (blur, beams, pulsing lights).
 4. Import real questions and team names/codes. The question bank must contain 120 Stage-1 MCQs, 24 Stage-2 questions, 15 Stage-3 questions and 21 reserve/tie-breaker questions. Every Blitz set needs exactly 3 easy, 3 medium, 3 hard and 1 joker. Review the models and accepted answers.
-5. Print codes from **الفرق والأكواد**. Codes are visible only in the admin interface and on the owning team's device. Keep the printouts away from the audience.
+5. Manage teams in **الفرق والأكواد**: add/edit teams, pick a colour, upload a logo (PNG/JPEG/WebP, resized automatically), import CSV/JSON, or use **توليد فرق وأكواد** to create teams with unique random three-digit codes. **طباعة أكواد الفرق** prints cut-out cards (two per row). Print codes Codes are visible only in the admin interface and on the owning team's device. Keep the printouts away from the audience.
 6. Download a full SQLite backup from **التصدير والنسخ**. Record the `DB_PATH`, `BACKUP_DIR` and server IP.
 7. Disconnect the router's WAN and rehearse. Package installation/building needs Internet once; gameplay does not.
+
+## The control room at a glance
+
+- **Stepper and big button**: the hero card shows where you are (rules → check-in → countdown → team time → results, plus wheel/card/audience/reveal steps in Stages 2–3). The large primary button always performs the next sensible action and is disabled, with a hint, while something is outstanding (teams not ready, cards missing, written answers ungraded). **Ctrl + Enter** triggers it from the keyboard.
+- **Live team cards**: check-in/ready state, score, a pip trail of right (green) and wrong (red) answers in Blitz, finish time, speed bonus, device latency and a _release device_ button.
+- **Grading queue**: written answers appear with the submission time in milliseconds. Press **1** for correct and **2** for wrong on the first pending answer.
+- **Toast confirmations**: every accepted command shows a short green confirmation; rejections show the red banner.
+- **Line-up picker** (side column): type a code or name, press Enter to add; click chips to remove; **اعتماد الفرق** saves. It locks once the round is running.
+- **Bracket draw** (_شجرة التصفيات_): drag a team chip onto another team to swap them across rounds, or press **سحب عشوائي** to shuffle every unfinished Stage-1 round. Changed rounds are outlined in gold; **اعتماد التوزيع** commits the whole draw atomically. **اختيار** on a round card selects that round.
+- **Settings** is a form (timing, points, speed-bonus tiers, joker position, card reuse, climb steps, group allocation, sound and live-scores switches) with the raw JSON editor under _متقدم_. Settings lock while a round is active.
+- **Question bank**: coverage bars, a 12-set matrix showing each Blitz set's 3/3/3/1 completeness, **تعبئة تلقائية للنماذج** to fill incomplete sets from unassigned questions, filters (stage, pool, level, category, used), a visual editor with a correct-answer radio, and a preview.
 
 ## Common controls
 
@@ -17,6 +28,7 @@ The header shows the authoritative phase and automation mode. The main green but
 - **تلقائي**: after all teams are ready, schedule a visible 3-second delay, then the 3-second countdown. After all cards are picked, schedule question start. After grading, schedule reveal and next question. Click **إلغاء الانتقال التلقائي** before a scheduled action fires. Switch to manual to hold a moment indefinitely.
 - **بمساعدة المسؤول** / **يدوي**: the operator confirms transitions. Timer expiry and completion still close answer collection automatically; readiness never starts a round by itself.
 - **إيقاف مؤقت** freezes collection and time. The team screens conceal their question while paused. **استئناف** preserves elapsed active time and recomputes the deadline.
+- **Live scores on the projector** (_الإعدادات ← تجربة العرض_): on by default. Turn it off if you do not want the room to infer who is answering correctly during Blitz; the projector then shows progress only until the round ends. Streak toasts, speed-bonus flashes, rank arrows and correct/wrong chimes follow the same switch.
 - **بدء إجباري** bypasses readiness, not lineup validity. Use only after checking the actual seated teams.
 - **اختيار الجولة** switches only from idle or results, and cannot reopen a completed round. Assign/override uncompleted lineups while idle, rules or handshake are open. Stage 1 begins with sequential groups of four; adjust the lineup if you want a draw.
 - Team devices retain assignments through browser refresh and reconnect. An offline assignment remains reserved until the admin releases it. **تحرير الجهاز** releases a team so a replacement device can check in. **تصفير الأجهزة** is available only outside active play.
@@ -35,7 +47,7 @@ The header shows the authoritative phase and automation mode. The main green but
 Stage-1 winners populate groups A/B/C from rounds 1–4 / 5–8 / 9–12. Settings can change this mapping. Select the group and follow rules/handshake/start.
 
 1. **اختيار التصنيف** chooses randomly on the server from categories with unused Stage-2 questions. The display animation is cosmetic.
-2. Each team selects 5/10/15 before the question is sent. **بدء السؤال والمؤقت** requires all cards; auto mode schedules it when all are selected.
+2. The projector's slot machine spins for about 4.6 seconds and lands on the category the server already chose; team screens reveal the category when the reel stops. Each team selects 5/10/15 before the question is sent. **بدء السؤال والمؤقت** requires all cards (auto mode schedules it when all are selected). If a team is stuck, **تعيين الكروت تلقائياً** gives teams without a card the lowest value.
 3. The 30-second answer period starts. MCQs are auto-graded; text/numeric submissions enter the grading queue. Press correct/wrong buttons, or 1/2 for the first pending answer when not typing in a form.
 4. After timeout or all submissions, show the question to the audience. Team screens hide it. Grade every pending answer. **إظهار الإجابة** commits each card's positive/negative score and displays the model. Unanswered cards are wrong by default.
 5. **السؤال التالي** returns to the wheel. Repeat eight questions. The highest score advances; tied leaders use a tie-breaker. Negative balances are valid.
@@ -51,13 +63,14 @@ The three Stage-2 winners automatically populate the final. Follow rules/handsha
 
 ## Tie-breakers
 
-From tied results, click **كسر التعادل**. Only tied teams can ready/answer. Other teams wait. When all tied teams are ready, click **إطلاق سؤال كسر التعادل** (or use auto mode). The server chooses an unused reserve/tie-breaker question. Inspect raw submission elapsed milliseconds and RTT in the admin queue. Grade text/numeric answers and reveal. Earliest correct receipt wins; no correct answer or an exact receipt tie repeats readiness with a new reserve question. Tie-breakers affect ranking, never the score ledger.
+From tied results, click **كسر التعادل**. Only tied teams can ready/answer. Other teams wait. When all tied teams are ready, optionally pick a specific question from the drop-down next to the hero button (default: first unused reserve/tie-breaker question), then click **إطلاق سؤال كسر التعادل** (or use auto mode). Inspect raw submission elapsed milliseconds and RTT in the admin queue. Grade text/numeric answers and reveal. Earliest correct receipt wins; no correct answer or an exact receipt tie repeats readiness with a new reserve question. Tie-breakers affect ranking, never the score ledger.
 
 ## Emergency correction
 
-- **Audience leak**: hold the flow in manual mode first. During a current question/audience/reveal, enter the leaked question ID (especially in self-paced Blitz) and optionally a reserve replacement ID. Click the leak action and confirm. The replacement must be unused reserve content; Blitz requires MCQ. The server prefers hard/joker replacements. Approve a suitably harder question using operator judgment.
+- **Audience leak**: hold the flow in manual mode first. During a current question/audience/reveal choose the leaked question from the drop-down (Blitz lists the round's ten questions; default is the current one) and optionally a specific reserve replacement (default: the hardest unused reserve question). Click **إلغاء السؤال واستبداله** and confirm. The replacement must be unused reserve content; Blitz requires MCQ. The server prefers hard/joker replacements. Approve a suitably harder question using operator judgment.
 - Leak correction writes reversals, retains original ledger rows, voids affected answers and consumes the original question. In Blitz, subsequent answers and speed bonuses are also reversed, and the affected teams rewind to that position while keeping the master round clock. This ensures a common set/order after a leak. Later questions may be replayed within this same correction; they cannot be reused in another round. Gambler/Climb preserve the card/position and start a fresh question timer.
 - If the Blitz master timer is already exhausted, replacement cannot grant extra time; make the leak decision promptly. Completed rounds are locked to avoid silently changing downstream qualification.
+- **Disrespectful objection**: choose the team and press **خصم 5 — اعتراض غير لائق** for an instant −5 with a logged reason.
 - **Manual penalty**: choose team, delta (e.g. −5), mandatory reason, then apply. It is available before completion in Blitz/Gambler. Ladder manual edits are deliberately disabled to preserve its bounds. **تراجع عن آخر تعديل** reverses the most recent unreversed manual adjustment; it does not undo arbitrary game commands.
 - A card/category reroll is possible before question start. It clears card selections so teams can decide again.
 

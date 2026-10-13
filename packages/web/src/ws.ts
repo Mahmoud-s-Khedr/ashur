@@ -10,12 +10,15 @@ export function identity(role: Role) {
   }
   return { id, token: localStorage.getItem(key + '-token') ?? undefined, key };
 }
-export function useConnection(role: Role, pin: string) {
+export function useConnection(role: Role, pin: string, onAck?: (type: string) => void) {
   const [snapshot, setSnapshot] = useState<any>(null),
     [connected, setConnected] = useState(false),
     [error, setError] = useState(''),
     [offset, setOffset] = useState(0);
   const ws = useRef<WebSocket | null>(null);
+  const pending = useRef<Map<string, string>>(new Map());
+  const ackRef = useRef(onAck);
+  ackRef.current = onAck;
   const samples = useRef<{ offset: number; rtt: number }[]>([]);
   useEffect(() => {
     if (role === 'admin' && !pin) return;
@@ -67,7 +70,15 @@ export function useConnection(role: Role, pin: string) {
           sync = setInterval(syncClock, 10000);
         }
         if (m.type === 'state.snapshot') setSnapshot(m.payload);
-        if (m.type === 'error') setError(m.payload.message);
+        if (m.type === 'error') {
+          if (m.payload.cmdId) pending.current.delete(m.payload.cmdId);
+          setError(m.payload.message);
+        }
+        if (m.type === 'command.ack') {
+          const type = pending.current.get(m.payload.cmdId);
+          pending.current.delete(m.payload.cmdId);
+          if (type) ackRef.current?.(type);
+        }
         if (m.type === 'time.pong') {
           const now = Date.now();
           samples.current.push({
@@ -101,7 +112,9 @@ export function useConnection(role: Role, pin: string) {
       setError('Connection unavailable');
       return;
     }
-    ws.current.send(JSON.stringify({ v: 1, type, cmdId: randomId(), payload }));
+    const cmdId = randomId();
+    pending.current.set(cmdId, type);
+    ws.current.send(JSON.stringify({ v: 1, type, cmdId, payload }));
   }, []);
   async function bulk(type: string, payload: unknown) {
     setError('');

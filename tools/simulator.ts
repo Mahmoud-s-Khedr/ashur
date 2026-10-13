@@ -249,6 +249,7 @@ try {
   await admin.cmd('round.forceStart');
   await wait(() => admin.s.phase === 'RUNNING', 'final question');
   // Crash while the question is live. All identities and current question survive.
+  await wait(() => teams[0].s.question, 'final question reaches the team');
   const questionId = teams[0].s.question.id;
   for (const b of all) b.close();
   server.kill('SIGKILL');
@@ -316,7 +317,35 @@ try {
   assert(backup.ok);
   assert((await backup.arrayBuffer()).byteLength > 0);
   for (const path of ['/admin', '/display', '/play']) assert((await fetch(url + path)).ok);
-  console.log('PASS authenticated exports, SQLite backup and static application routes.');
+  const auth = { Authorization: `Bearer ${admin.token}` };
+  const auditCsv = await (await fetch(url + '/api/audit.csv', { headers: auth })).text();
+  assert(auditCsv.split('\n').length > 5 && auditCsv.includes('answer.submit'));
+  assert.equal((await fetch(url + '/api/audit.csv')).status, 401);
+  const network = (await (await fetch(url + '/api/network', { headers: auth })).json()) as {
+    port: number;
+    addresses: string[];
+  };
+  assert(Array.isArray(network.addresses) && network.port > 0);
+  // Team logo round trip: public image route, versioned, never inside snapshots.
+  assert.equal((await fetch(url + '/logo/1')).status, 404);
+  const png =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const saved = await fetch(url + '/api/command', {
+    method: 'POST',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'teams.save',
+      cmdId: 'logo-1',
+      payload: { teams: [{ id: 1, code: '111', name: 'الفريق 1', color: '#27d6b0', logo: png }] },
+    }),
+  });
+  assert(saved.ok, await saved.clone().text());
+  const logo = await fetch(url + '/logo/1');
+  assert.equal(logo.headers.get('content-type'), 'image/png');
+  assert((await logo.arrayBuffer()).byteLength > 20);
+  console.log(
+    'PASS authenticated exports, audit CSV, team logos, SQLite backup and static routes.',
+  );
   console.log('All simulator checks passed.');
 } catch (e) {
   console.error(e);
