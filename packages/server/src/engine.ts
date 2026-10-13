@@ -177,7 +177,7 @@ export class Engine {
   teams() {
     return this.db
       .prepare(
-        'SELECT id,code,name,color,status,COALESCE(logo_v,0) AS logoV FROM teams ORDER BY id',
+        'SELECT id,code,name,color,status,CASE WHEN logo IS NULL THEN 0 ELSE COALESCE(logo_v,0) END AS logoV FROM teams ORDER BY id',
       )
       .all() as Team[];
   }

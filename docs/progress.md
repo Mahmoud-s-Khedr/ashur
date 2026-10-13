@@ -13,4 +13,4 @@ Loopback simultaneous-question spread observed in the first socket run: **0.037â
 
 Implementation choices and remaining optional conveniences are listed in `assumptions.md`. Seeded content is illustrative and must be replaced.
 
-Final local gate: 45 unit/engine/import/clock tests, `pnpm sim` (all stages, crash recovery, 20-socket load) and `pnpm smoke`, strict TypeScript and production build pass. Browser smoke also covers the absence of secure-context-only crypto.randomUUID so plain LAN HTTP identities work.
+Final local gate: 49 unit/engine/import/clock tests, `pnpm sim` (all stages, crash recovery, 20-socket load) and `pnpm smoke`, strict TypeScript and production build pass. Browser smoke also covers the absence of secure-context-only crypto.randomUUID so plain LAN HTTP identities work.

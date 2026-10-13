@@ -540,6 +540,7 @@ describe('presentation support', () => {
       admin,
     );
     expect(engine.logo(1)?.logo).toBeNull();
+    expect(engine.teams()[0].logoV).toBe(0);
     expect(() =>
       engine.dispatch(
         'teams.save',
