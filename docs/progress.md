@@ -1,3 +1,16 @@
-# Milestone verification
+# Verification and delivery status
 
-M0/M1: foundation and Blitz verified with 22 unit/engine tests and strict TypeScript checks. Includes seeded SQLite, role-scoped snapshots, WebSocket gateway, device tokens, PIN checks, command deduplication, atomic dispatch, check-in, ready/countdown, self-paced Blitz, speed bonuses, tie-breaker, bracket advancement, pause/resume and paused recovery. Browser interface is being implemented next. Real LAN arrival timing remains a rehearsal check.
+- **M0 foundation:** pnpm workspace, strict TypeScript, Fastify/ws, SQLite WAL/FULL, seeded data, hashed device tokens, role-scoped snapshots, heartbeat/clock sync. Verified by unit/engine checks and real socket clients.
+- **M1 Blitz:** check-in/readiness, countdown, self-paced questions, exact scoring, bonus boundaries, tie-breaker, bracket advancement and pause/recovery. Verified by engine and socket tests.
+- **M2 admin tooling:** Arabic control UI, team/question CRUD/import, coverage, set builder, manual grading/adjustments, leak reversal, manual undo, audit and exports. Import validation and emergency ledger tests pass; browser editing/flow checks pass.
+- **M3 Gambler:** card-before-question gating, crypto category selection, eight-question group, negative balances, grading, audience/reveal. Full group engine and real socket tests pass.
+- **M4 Final:** ladder scoring, bounded positions, simultaneous-finish receipt arbitration, championship and 15-question path. Full final engine and socket tests pass.
+- **M5 presentation:** RTL admin/play/display, local Tajawal, lineup/ready, bracket, wheel, ladder, results, confetti and Web Audio. Chromium smoke and narrow-player layout pass; screenshots reviewed.
+- **M6 hardening:** persisted idempotency, late/double-answer rejection, disconnect and SIGKILL recovery, authenticated exports/SQLite backup, 20-socket load test at 100 messages/s with 1,000/1,000 pongs, Linux/Windows start scripts and runbook.
+- **M7 venue rehearsal:** not executable in this cloud workspace. Use the actual router, devices and reviewed question bank with the supplied checklist.
+
+Loopback simultaneous-question spread observed in the first socket run: **0.037–2.575 ms**. Repeat on the real LAN; no zero-latency guarantee is claimed. Browser smoke verifies same-origin runtime requests, not physical WAN removal. Linux execution is verified; the Windows launcher needs venue testing.
+
+Implementation choices and remaining optional conveniences are listed in `assumptions.md`. Seeded content is illustrative and must be replaced.
+
+Final local gate: 39 unit/engine/import/timer tests, strict TypeScript and production build pass. Browser smoke also covers the absence of secure-context-only crypto.randomUUID so plain LAN HTTP identities work.

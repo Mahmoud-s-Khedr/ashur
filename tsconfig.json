@@ -8,13 +8,7 @@
     "skipLibCheck": true,
     "jsx": "react-jsx",
     "resolveJsonModule": true,
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
-  "include": [
-    "packages/**/*.ts",
-    "packages/**/*.tsx",
-    "tools/**/*.ts"
-  ]
+  "include": ["packages/**/*.ts", "packages/**/*.tsx", "tools/**/*.ts"]
 }

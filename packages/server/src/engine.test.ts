@@ -1,18 +1,455 @@
-import {beforeEach,afterEach,describe,it,expect} from 'vitest';
-import {openDb} from './db';import{seed}from './seed';import{Engine}from './engine';
-let db:ReturnType<typeof openDb>,engine:Engine;let clock=0;const admin={role:'admin' as const,deviceId:'admin'};const team=(teamId:number)=>({role:'team' as const,deviceId:`team-${teamId}`,teamId});
-function start(key='1-1'){engine.dispatch('settings.update',{settings:{automation:'manual',countdownMs:1}},admin);if(key!=='1-1')engine.dispatch('round.select',{key},admin);if(engine.round.stage!==1)engine.dispatch('round.assignTeams',{teamIds:engine.round.stage===3?[1,2,3]:[1,2,3,4]},admin);engine.dispatch('round.openHandshake',{},admin);engine.dispatch('round.forceStart',{},admin);engine.state.endsAt=Date.now()-1;engine.dispatch('system.tick',{}, {role:'system',deviceId:'timer'});}
-beforeEach(()=>{clock=0;db=openDb(':memory:');seed(db);engine=new Engine(db,()=>clock);});afterEach(()=>db.close());
-describe('M0 foundation',()=>{
- it('seeds exactly 48 teams and 180 questions',()=>{expect(engine.teams()).toHaveLength(48);expect(engine.questions()).toHaveLength(180);});
- it('hides codes and answers from untrusted roles',()=>{const s=engine.snapshot({role:'display',deviceId:'display'});expect(JSON.stringify(s)).not.toContain('"code"');expect(s).not.toHaveProperty('questions');expect(s).not.toHaveProperty('answers');});
- it('persists snapshots with WAL-compatible schema',()=>{engine.dispatch('round.showRules',{},admin);expect(new Engine(db).state.phase).toBe('RULES');});
+import { beforeEach, afterEach, describe, it, expect } from 'vitest';
+import { openDb } from './db';
+import { seed } from './seed';
+import { Engine } from './engine';
+let db: ReturnType<typeof openDb>, engine: Engine;
+let clock = 0;
+const admin = { role: 'admin' as const, deviceId: 'admin' };
+const team = (teamId: number) => ({ role: 'team' as const, deviceId: `team-${teamId}`, teamId });
+function start(key = '1-1') {
+  engine.dispatch('settings.update', { settings: { automation: 'manual', countdownMs: 1 } }, admin);
+  if (key !== '1-1') engine.dispatch('round.select', { key }, admin);
+  if (engine.round.stage !== 1)
+    engine.dispatch(
+      'round.assignTeams',
+      { teamIds: engine.round.stage === 3 ? [1, 2, 3] : [1, 2, 3, 4] },
+      admin,
+    );
+  engine.dispatch('round.openHandshake', {}, admin);
+  engine.dispatch('round.forceStart', {}, admin);
+  engine.state.endsAt = Date.now() - 1;
+  engine.dispatch('system.tick', {}, { role: 'system', deviceId: 'timer' });
+}
+beforeEach(() => {
+  clock = 0;
+  db = openDb(':memory:');
+  seed(db);
+  engine = new Engine(db, () => clock);
 });
-describe('M1 Blitz',()=>{
- it('rejects illegal and unauthorized transitions atomically',()=>{expect(()=>engine.dispatch('round.start',{},admin)).toThrow();expect(()=>engine.dispatch('round.showRules',{},team(1))).toThrow();expect(engine.state.version).toBe(0);expect(db.prepare('SELECT COUNT(*) n FROM event_log').get()).toEqual({n:0});});
- it('scores a complete round, bonus, winner and bracket advancement',()=>{start();clock=5000;for(let i=0;i<10;i++)for(let id=1;id<=4;id++)engine.dispatch('answer.submit',{roundQuestionId:engine.state.set[i],answer:id===1?0:1},team(id),`${id}-${i}`);expect(engine.state.phase).toBe('RESULTS');expect(engine.scores()[1]).toBe(96);expect(engine.scores()[2]).toBe(10);expect(engine.state.winner).toBe(1);expect(engine.state.rounds.find(r=>r.key==='2-1')!.teamIds).toEqual([1]);});
- it('accepts first submission only and deduplicates cmdId across reconnect',()=>{start();const p={roundQuestionId:engine.state.set[0],answer:0};engine.dispatch('answer.submit',p,team(1),'first');expect(engine.dispatch('answer.submit',p,team(1),'first').duplicate).toBe(true);expect(()=>engine.dispatch('answer.submit',p,team(1),'other')).toThrow('Stale');expect(engine.scores()[1]).toBe(5);});
- it('freezes time on pause and restores paused after restart',()=>{start();clock=10000;engine.dispatch('round.pause',{},admin);const elapsed=engine.state.elapsedMs;clock=50000;expect(engine.elapsed()).toBe(elapsed);engine.dispatch('round.resume',{},admin);clock=51000;expect(engine.elapsed()).toBe(elapsed+1000);engine.dispatch('system.tick',{}, {role:'system',deviceId:'timer'});const recovered=new Engine(db);expect(recovered.state.paused).toBe(true);expect(recovered.state.remainingMs).toBeGreaterThan(0);});
- it('rejects late answers and never sends team verdicts',()=>{start();const q=engine.state.set[0];expect(engine.snapshot(team(1)).question).not.toHaveProperty('correct');engine.state.endsAt=Date.now()-1;expect(()=>engine.dispatch('answer.submit',{roundQuestionId:q,answer:0},team(1))).toThrow('deadline');});
- it('resolves ties without changing competition scores',()=>{start();for(let i=0;i<10;i++)for(let id=1;id<=4;id++)engine.dispatch('answer.submit',{roundQuestionId:engine.state.set[i],answer:0},team(id));expect(engine.state.phase).toBe('REVIEW');engine.dispatch('tiebreak.open',{},admin);for(let id=1;id<=4;id++)engine.dispatch('team.ready',{},team(id));engine.dispatch('tiebreak.launch',{},admin);const q=engine.question(engine.state.tieQuestion!)!;for(let id=1;id<=4;id++){clock=id*100;engine.dispatch('answer.submit',{roundQuestionId:q.id,answer:(q.correct as string[])[0]},team(id));}for(const a of engine.state.answers.filter(a=>a.questionId===q.id))engine.dispatch('grade.set',{answerId:a.id,verdict:'correct'},admin);const scores=engine.scores();engine.dispatch('question.reveal',{},admin);expect(engine.state.winner).toBe(1);expect(engine.scores()).toEqual(scores);});
+afterEach(() => db.close());
+describe('M0 foundation', () => {
+  it('seeds exactly 48 teams and 180 questions', () => {
+    expect(engine.teams()).toHaveLength(48);
+    expect(engine.questions()).toHaveLength(180);
+  });
+  it('hides codes and answers from untrusted roles', () => {
+    const s = engine.snapshot({ role: 'display', deviceId: 'display' });
+    expect(JSON.stringify(s)).not.toContain('"code"');
+    expect(s).not.toHaveProperty('questions');
+    expect(s).not.toHaveProperty('answers');
+  });
+  it('persists snapshots with WAL-compatible schema', () => {
+    engine.dispatch('round.showRules', {}, admin);
+    expect(new Engine(db).state.phase).toBe('RULES');
+  });
+});
+describe('M1 Blitz', () => {
+  it('rejects illegal and unauthorized transitions atomically', () => {
+    expect(() => engine.dispatch('round.start', {}, admin)).toThrow();
+    expect(() => engine.dispatch('round.showRules', {}, team(1))).toThrow();
+    expect(engine.state.version).toBe(0);
+    expect(db.prepare('SELECT COUNT(*) n FROM event_log').get()).toEqual({ n: 0 });
+  });
+  it('scores a complete round, bonus, winner and bracket advancement', () => {
+    start();
+    clock = 5000;
+    for (let i = 0; i < 10; i++)
+      for (let id = 1; id <= 4; id++)
+        engine.dispatch(
+          'answer.submit',
+          { roundQuestionId: engine.state.set[i], answer: id === 1 ? 0 : 1 },
+          team(id),
+          `${id}-${i}`,
+        );
+    expect(engine.state.phase).toBe('RESULTS');
+    expect(engine.scores()[1]).toBe(96);
+    expect(engine.scores()[2]).toBe(10);
+    expect(engine.state.winner).toBe(1);
+    expect(engine.state.rounds.find((r) => r.key === '2-1')!.teamIds).toEqual([1]);
+  });
+  it('accepts first submission only and deduplicates cmdId across reconnect', () => {
+    start();
+    const p = { roundQuestionId: engine.state.set[0], answer: 0 };
+    engine.dispatch('answer.submit', p, team(1), 'first');
+    expect(engine.dispatch('answer.submit', p, team(1), 'first').duplicate).toBe(true);
+    expect(() => engine.dispatch('answer.submit', p, team(1), 'other')).toThrow('Stale');
+    expect(engine.scores()[1]).toBe(5);
+  });
+  it('freezes time on pause and restores paused after restart', () => {
+    start();
+    clock = 10000;
+    engine.dispatch('round.pause', {}, admin);
+    const elapsed = engine.state.elapsedMs;
+    clock = 50000;
+    expect(engine.elapsed()).toBe(elapsed);
+    engine.dispatch('round.resume', {}, admin);
+    clock = 51000;
+    expect(engine.elapsed()).toBe(elapsed + 1000);
+    engine.dispatch('system.tick', {}, { role: 'system', deviceId: 'timer' });
+    const recovered = new Engine(db);
+    expect(recovered.state.paused).toBe(true);
+    expect(recovered.state.remainingMs).toBeGreaterThan(0);
+  });
+  it('rejects late answers and never sends team verdicts', () => {
+    start();
+    const q = engine.state.set[0];
+    expect(engine.snapshot(team(1)).question).not.toHaveProperty('correct');
+    engine.state.endsAt = Date.now() - 1;
+    expect(() =>
+      engine.dispatch('answer.submit', { roundQuestionId: q, answer: 0 }, team(1)),
+    ).toThrow('deadline');
+  });
+  it('resolves ties without changing competition scores', () => {
+    start();
+    for (let i = 0; i < 10; i++)
+      for (let id = 1; id <= 4; id++)
+        engine.dispatch(
+          'answer.submit',
+          { roundQuestionId: engine.state.set[i], answer: 0 },
+          team(id),
+        );
+    expect(engine.state.phase).toBe('REVIEW');
+    engine.dispatch('tiebreak.open', {}, admin);
+    for (let id = 1; id <= 4; id++) engine.dispatch('team.ready', {}, team(id));
+    engine.dispatch('tiebreak.launch', {}, admin);
+    const q = engine.question(engine.state.tieQuestion!)!;
+    for (let id = 1; id <= 4; id++) {
+      clock = id * 100;
+      engine.dispatch(
+        'answer.submit',
+        { roundQuestionId: q.id, answer: (q.correct as string[])[0] },
+        team(id),
+      );
+    }
+    for (const a of engine.state.answers.filter((a) => a.questionId === q.id))
+      engine.dispatch('grade.set', { answerId: a.id, verdict: 'correct' }, admin);
+    const scores = engine.scores();
+    engine.dispatch('question.reveal', {}, admin);
+    expect(engine.state.winner).toBe(1);
+    expect(engine.scores()).toEqual(scores);
+  });
+});
+describe('M2 admin tools', () => {
+  it('imports atomically and protects consumed questions', () => {
+    const q = engine.questions()[0];
+    const count = engine.questions().length;
+    const { id, ...copy } = q;
+    copy.setNo = null;
+    expect(() =>
+      engine.dispatch('questions.save', { questions: [copy, { ...copy, body: '' }] }, admin),
+    ).toThrow();
+    expect(engine.questions()).toHaveLength(count);
+    engine.dispatch('questions.save', { questions: [copy] }, admin);
+    expect(engine.questions()).toHaveLength(count + 1);
+    start();
+    expect(() => engine.dispatch('questions.delete', { id: q.id }, admin)).toThrow();
+  });
+  it('keeps an append-only ledger for adjustments and undo', () => {
+    engine.dispatch('score.adjust', { teamId: 1, delta: -5, reason: 'Objection' }, admin);
+    expect(engine.scores()[1]).toBe(-5);
+    engine.dispatch('undo.last', {}, admin);
+    expect(engine.scores()[1]).toBe(0);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM score_events').get()).toEqual({ n: 2 });
+    expect(() => engine.dispatch('undo.last', {}, admin)).toThrow();
+  });
+  it('validates set distribution and restores leaks exactly', () => {
+    start();
+    const qId = engine.state.set[0];
+    for (let id = 1; id <= 4; id++)
+      engine.dispatch('answer.submit', { roundQuestionId: qId, answer: 0 }, team(id));
+    expect(engine.scores()[1]).toBe(5);
+    engine.dispatch('question.cancelLeak', { questionId: qId }, admin);
+    expect(engine.scores()[1]).toBe(0);
+    expect(engine.state.progress[1]).toBe(0);
+    expect(engine.state.set[0]).not.toBe(qId);
+    expect(engine.state.answers[0].verdict).toBe('void');
+    expect(engine.state.phase).toBe('RUNNING');
+    expect(engine.question(qId)?.used).toBe(true);
+  });
+  it('binds one device per team, releases only on admin kick', () => {
+    for (const id of ['device-a', 'device-b'])
+      db.prepare('INSERT INTO devices(id,role,token_hash) VALUES(?,?,?)').run(id, 'team', id);
+    engine.dispatch('team.checkin', { code: '111' }, { role: 'team', deviceId: 'device-a' });
+    expect(() =>
+      engine.dispatch('team.checkin', { code: '111' }, { role: 'team', deviceId: 'device-b' }),
+    ).toThrow('already');
+    engine.dispatch('checkin.kick', { teamId: 1 }, admin);
+    expect(
+      engine.dispatch('team.checkin', { code: '111' }, { role: 'team', deviceId: 'device-b' })
+        .teamId,
+    ).toBe(1);
+  });
+});
+describe('M3 Gambler', () => {
+  it('runs all eight questions with cards chosen before seeing questions', () => {
+    start('2-1');
+    expect(engine.state.phase).toBe('WHEEL');
+    for (let i = 0; i < 8; i++) {
+      engine.dispatch('wheel.spin', {}, admin);
+      expect(engine.snapshot(team(1)).question).toBeNull();
+      for (let id = 1; id <= 4; id++) engine.dispatch('card.select', { value: 15 }, team(id));
+      expect(() => engine.dispatch('card.select', { value: 5 }, team(1))).toThrow('already');
+      engine.dispatch('question.start', {}, admin);
+      const q = engine.question(engine.state.set[i])!;
+      for (let id = 1; id <= 4; id++)
+        engine.dispatch(
+          'answer.submit',
+          {
+            roundQuestionId: q.id,
+            answer:
+              q.type === 'mcq'
+                ? id === 1
+                  ? q.correct
+                  : 1
+                : id === 1
+                  ? (q.correct as string[])[0]
+                  : 'wrong',
+          },
+          team(id),
+        );
+      if (q.type !== 'mcq')
+        for (const a of engine.state.answers.filter((a) => a.questionId === q.id))
+          engine.dispatch(
+            'grade.set',
+            { answerId: a.id, verdict: a.teamId === 1 ? 'correct' : 'wrong' },
+            admin,
+          );
+      expect(engine.state.phase).toBe('AUDIENCE');
+      expect(engine.snapshot({ role: 'display', deviceId: 'display' }).question).not.toHaveProperty(
+        'correct',
+      );
+      engine.dispatch('question.reveal', {}, admin);
+      if (i < 7) engine.dispatch('question.next', {}, admin);
+    }
+    expect(engine.state.phase).toBe('RESULTS');
+    expect(engine.scores()[1]).toBe(120);
+    expect(engine.scores()[2]).toBe(-120);
+    expect(engine.state.rounds.find((r) => r.key === '3-1')?.teamIds).toContain(1);
+  });
+  it('penalizes unanswered cards and reverses revealed leak scores', () => {
+    start('2-1');
+    engine.dispatch('wheel.spin', {}, admin);
+    for (let id = 1; id <= 4; id++) engine.dispatch('card.select', { value: 10 }, team(id));
+    engine.dispatch('question.start', {}, admin);
+    engine.state.endsAt = Date.now() - 1;
+    engine.dispatch('system.tick', {}, { role: 'system', deviceId: 'timer' });
+    engine.dispatch('question.reveal', {}, admin);
+    expect(engine.scores()[1]).toBe(-10);
+    engine.dispatch('question.cancelLeak', {}, admin);
+    expect(engine.scores()[1]).toBe(0);
+    expect(engine.state.phase).toBe('RUNNING');
+  });
+  it('requires manual grading before revealing text answers', () => {
+    start('2-1');
+    engine.dispatch('wheel.spin', {}, admin);
+    for (let id = 1; id <= 4; id++) engine.dispatch('card.select', { value: 5 }, team(id));
+    const q = engine.questions().find((q) => q.stage === 2 && q.type === 'text')!;
+    engine.state.category = q.category;
+    engine.dispatch('question.start', {}, admin);
+    engine.state.set[0] = q.id;
+    for (let id = 1; id <= 4; id++)
+      engine.dispatch('answer.submit', { roundQuestionId: q.id, answer: 'value' }, team(id));
+    expect(() => engine.dispatch('question.reveal', {}, admin)).toThrow('Grade all');
+  });
+});
+describe('M4 Final Climb', () => {
+  it('crowns the fastest team reaching the top on the same question', () => {
+    start('3-1');
+    for (let i = 0; i < 10; i++) {
+      const q = engine.question(engine.state.set[i])!;
+      for (let id = 1; id <= 3; id++) {
+        clock = i * 1000 + id * 10;
+        engine.dispatch(
+          'answer.submit',
+          {
+            roundQuestionId: q.id,
+            answer: q.type === 'mcq' ? q.correct : (q.correct as string[])[0],
+          },
+          team(id),
+        );
+      }
+      if (q.type !== 'mcq')
+        for (const a of engine.state.answers.filter((a) => a.questionId === q.id))
+          engine.dispatch('grade.set', { answerId: a.id, verdict: 'correct' }, admin);
+      engine.dispatch('question.reveal', {}, admin);
+      if (i < 9) engine.dispatch('question.next', {}, admin);
+    }
+    expect(engine.state.phase).toBe('RESULTS');
+    expect(engine.state.winner).toBe(1);
+    expect(engine.scores()[1]).toBe(10);
+    expect(engine.teams().find((t) => t.id === 1)?.status).toBe('champion');
+  });
+  it('does not drop below ground on unanswered questions', () => {
+    start('3-1');
+    engine.state.endsAt = Date.now() - 1;
+    engine.dispatch('system.tick', {}, { role: 'system', deviceId: 'timer' });
+    engine.dispatch('question.reveal', {}, admin);
+    expect(engine.scores()[1]).toBe(0);
+    expect(engine.snapshot({ role: 'display', deviceId: 'display' }).lineup[0].score).toBe(0);
+  });
+});
+describe('full 48-team tournament', () => {
+  it('advances 48 → 12 → 3 → champion using all configured rounds', () => {
+    engine.dispatch(
+      'settings.update',
+      { settings: { automation: 'manual', countdownMs: 1 } },
+      admin,
+    );
+    function begin() {
+      engine.dispatch('round.openHandshake', {}, admin);
+      engine.dispatch('round.forceStart', {}, admin);
+      engine.state.endsAt = Date.now() - 1;
+      engine.dispatch('system.tick', {}, { role: 'system', deviceId: 'timer' });
+    }
+    for (let r = 0; r < 12; r++) {
+      begin();
+      const ids = [...engine.round.teamIds];
+      for (let i = 0; i < 10; i++)
+        for (const id of ids) {
+          clock += 10;
+          engine.dispatch(
+            'answer.submit',
+            { roundQuestionId: engine.state.set[i], answer: id === ids[0] ? 0 : 1 },
+            team(id),
+          );
+        }
+      expect(engine.state.winner).toBe(ids[0]);
+      engine.dispatch('round.next', {}, admin);
+    }
+    expect(engine.state.rounds.filter((r) => r.stage === 1 && r.winner)).toHaveLength(12);
+    expect(
+      engine.state.rounds.filter((r) => r.stage === 2).every((r) => r.teamIds.length === 4),
+    ).toBe(true);
+    for (let r = 0; r < 3; r++) {
+      begin();
+      const ids = [...engine.round.teamIds];
+      for (let i = 0; i < 8; i++) {
+        engine.dispatch('wheel.spin', {}, admin);
+        for (const id of ids) engine.dispatch('card.select', { value: 15 }, team(id));
+        engine.dispatch('question.start', {}, admin);
+        const q = engine.question(engine.state.set[i])!;
+        for (const id of ids) {
+          clock += 10;
+          engine.dispatch(
+            'answer.submit',
+            {
+              roundQuestionId: q.id,
+              answer:
+                q.type === 'mcq'
+                  ? id === ids[0]
+                    ? q.correct
+                    : 1
+                  : id === ids[0]
+                    ? (q.correct as string[])[0]
+                    : 'wrong',
+            },
+            team(id),
+          );
+        }
+        for (const a of engine.state.answers.filter((a) => a.verdict === 'pending'))
+          engine.dispatch(
+            'grade.set',
+            { answerId: a.id, verdict: a.teamId === ids[0] ? 'correct' : 'wrong' },
+            admin,
+          );
+        engine.dispatch('question.reveal', {}, admin);
+        if (i < 7) engine.dispatch('question.next', {}, admin);
+      }
+      engine.dispatch('round.next', {}, admin);
+    }
+    expect(engine.round.teamIds).toHaveLength(3);
+    begin();
+    const ids = [...engine.round.teamIds];
+    for (let i = 0; i < 10; i++) {
+      const q = engine.question(engine.state.set[i])!;
+      for (const id of ids) {
+        clock += 10;
+        engine.dispatch(
+          'answer.submit',
+          {
+            roundQuestionId: q.id,
+            answer:
+              q.type === 'mcq'
+                ? id === ids[0]
+                  ? q.correct
+                  : 1
+                : id === ids[0]
+                  ? (q.correct as string[])[0]
+                  : 'wrong',
+          },
+          team(id),
+        );
+      }
+      for (const a of engine.state.answers.filter((a) => a.verdict === 'pending'))
+        engine.dispatch(
+          'grade.set',
+          { answerId: a.id, verdict: a.teamId === ids[0] ? 'correct' : 'wrong' },
+          admin,
+        );
+      engine.dispatch('question.reveal', {}, admin);
+      if (i < 9) engine.dispatch('question.next', {}, admin);
+    }
+    expect(engine.state.winner).toBe(1);
+    expect(engine.teams().filter((t) => t.status === 'champion')).toHaveLength(1);
+    expect(engine.state.rounds.every((r) => r.completed)).toBe(true);
+  });
+});
+describe('operator overrides and final fallback', () => {
+  it('consumes a scheduled auto action when the operator triggers it early', () => {
+    start('2-1');
+    engine.dispatch('automation.set', { mode: 'auto' }, admin);
+    engine.dispatch('wheel.spin', {}, admin);
+    for (let id = 1; id <= 4; id++) engine.dispatch('card.select', { value: 5 }, team(id));
+    expect(engine.state.autoAction).toBe('question.start');
+    engine.dispatch('question.start', {}, admin);
+    expect(engine.state.autoAt).toBe(0);
+    expect(engine.state.autoAction).toBe('');
+  });
+  it('selects the highest position after all fifteen questions', () => {
+    start('3-1');
+    for (let i = 0; i < 15; i++) {
+      const q = engine.question(engine.state.set[i])!;
+      for (let id = 1; id <= 3; id++) {
+        clock += 10;
+        const correct = id === 1 && i % 2 === 0;
+        engine.dispatch(
+          'answer.submit',
+          {
+            roundQuestionId: q.id,
+            answer:
+              q.type === 'mcq'
+                ? correct
+                  ? q.correct
+                  : 1
+                : correct
+                  ? (q.correct as string[])[0]
+                  : 'wrong',
+          },
+          team(id),
+        );
+      }
+      for (const a of engine.state.answers.filter((a) => a.verdict === 'pending'))
+        engine.dispatch(
+          'grade.set',
+          { answerId: a.id, verdict: a.teamId === 1 && i % 2 === 0 ? 'correct' : 'wrong' },
+          admin,
+        );
+      engine.dispatch('question.reveal', {}, admin);
+      if (i < 14) engine.dispatch('question.next', {}, admin);
+    }
+    expect(engine.state.phase).toBe('RESULTS');
+    expect(engine.state.winner).toBe(1);
+    expect(engine.scores()[1]).toBe(1);
+  });
+  it('rejects elapsed monotonic deadlines despite a future wall deadline', () => {
+    start();
+    clock = 120001;
+    expect(() =>
+      engine.dispatch(
+        'answer.submit',
+        { roundQuestionId: engine.state.set[0], answer: 0 },
+        team(1),
+      ),
+    ).toThrow('deadline');
+  });
 });

@@ -1,10 +1,13 @@
 import Database from 'better-sqlite3';
-import {mkdirSync} from 'node:fs';
-import {dirname,resolve} from 'node:path';
-export function openDb(path=process.env.DB_PATH||'data/ashour.sqlite') {
- if(path!==':memory:')mkdirSync(dirname(resolve(path)),{recursive:true});
- const db=new Database(path);db.pragma('journal_mode = WAL');db.pragma('synchronous = FULL');db.pragma('foreign_keys = ON');
- db.exec(`CREATE TABLE IF NOT EXISTS migrations(version INTEGER PRIMARY KEY);
+import { mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+export function openDb(path = process.env.DB_PATH || 'data/ashour.sqlite') {
+  if (path !== ':memory:') mkdirSync(dirname(resolve(path)), { recursive: true });
+  const db = new Database(path);
+  db.pragma('journal_mode = WAL');
+  db.pragma('synchronous = FULL');
+  db.pragma('foreign_keys = ON');
+  db.exec(`CREATE TABLE IF NOT EXISTS migrations(version INTEGER PRIMARY KEY);
  CREATE TABLE IF NOT EXISTS teams(id INTEGER PRIMARY KEY,code TEXT UNIQUE NOT NULL,name TEXT UNIQUE NOT NULL,color TEXT NOT NULL,status TEXT DEFAULT 'active');
  CREATE TABLE IF NOT EXISTS questions(id INTEGER PRIMARY KEY,json TEXT NOT NULL,is_used INTEGER DEFAULT 0,is_deleted INTEGER DEFAULT 0);
  CREATE TABLE IF NOT EXISTS match_state(id INTEGER PRIMARY KEY CHECK(id=1),json TEXT NOT NULL,version INTEGER NOT NULL);
@@ -16,6 +19,7 @@ export function openDb(path=process.env.DB_PATH||'data/ashour.sqlite') {
  CREATE INDEX IF NOT EXISTS idx_scores ON score_events(round_key,team_id);
  CREATE INDEX IF NOT EXISTS idx_answers ON answers(round_key,question_id);
  CREATE VIEW IF NOT EXISTS v_team_round_scores AS SELECT round_key,team_id,SUM(delta) AS score FROM score_events GROUP BY round_key,team_id;
- INSERT OR IGNORE INTO migrations VALUES(1);`);return db;
+ INSERT OR IGNORE INTO migrations VALUES(1);`);
+  return db;
 }
-export type DB=ReturnType<typeof openDb>;
+export type DB = ReturnType<typeof openDb>;
