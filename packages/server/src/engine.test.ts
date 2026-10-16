@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import { openDb } from './db';
-import { seed } from './seed';
+import { seed } from './demo-seed';
 import { Engine } from './engine';
 let db: ReturnType<typeof openDb>, engine: Engine;
 let clock = 0;

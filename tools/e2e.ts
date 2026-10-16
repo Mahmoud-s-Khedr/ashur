@@ -47,6 +47,7 @@ export class Server {
       {
         env: {
           ...process.env,
+          QUESTION_BANK: 'demo',
           HOST: '127.0.0.1',
           PORT: String(this.port),
           ADMIN_PIN: this.pin,

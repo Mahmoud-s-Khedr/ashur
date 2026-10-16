@@ -27,7 +27,9 @@ On the server computer: `http://localhost:3000/admin`. On other computers replac
 
 The server listens on `0.0.0.0` by default and prints detected interface URLs. Set `HOST` to a specific LAN IP if needed. Allow inbound TCP port 3000 on the server firewall. Use wired Ethernet and reserve the server's IP on your router. This is a closed-LAN application; do not expose the port on the Internet.
 
-**The seed is a demo bank:** 48 teams with codes **111–158**, 180 Arabic placeholder questions, and the required question distributions. Replace the questions and team codes before a real competition. Seeding never overwrites an existing database. To start a separate rehearsal, choose a different `DB_PATH`.
+**The seed uses the real question bank:** all 112 questions from `أسئلة عاشور.xlsx`, arranged into 180 slots: 120 Blitz questions (12 sets of 3 easy / 3 medium / 3 hard / 1 joker), 24 Gambler questions, 15 Final Climb questions, and 21 tie-breaker/reserve questions. Multiple-choice distractors were added, and questions repeat across rounds to fill the tournament. Workbook wording and model answers are preserved apart from surrounding whitespace and numeric cell formatting; hard questions also fill joker slots. Review the added choices before the event. The 48 teams still have demo codes **111–158**; change those codes before the competition.
+
+`pnpm seed` and server startup fill an empty question bank and preserve existing content. For an existing demo database, import [the generated question bank](packages/server/content/questions.json) through the admin question bank to replace unused IDs 1–180. Used questions and active sets remain protected. `pnpm questions:build` rebuilds that JSON from [the source content and authored distractors](packages/server/content/ashour-source.json). For an isolated demo rehearsal, set `QUESTION_BANK=demo` and choose a separate `DB_PATH`.
 
 ## The experience
 
@@ -81,4 +83,4 @@ packages/web/src/     React admin/, display/, play/ screens, shared ui/ parts (b
  docs/               operator instructions and verification status
 ```
 
-Runtime data, backups, `.env`, and dependencies are ignored by Git. A public repository contains source and demo content; actual event questions and device credentials live in the local database.
+Runtime data, backups, `.env`, and dependencies are ignored by Git. The bundled workbook content, generated choices and question bank are part of the source tree. Device credentials and runtime changes live in the local database.

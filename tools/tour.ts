@@ -86,6 +86,7 @@ async function main() {
   const server: ChildProcess = spawn('pnpm', ['exec', 'tsx', 'packages/server/src/index.ts'], {
     env: {
       ...process.env,
+      QUESTION_BANK: 'demo',
       ADMIN_PIN: PIN,
       PORT: String(PORT),
       HOST: '127.0.0.1',

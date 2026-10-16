@@ -23,7 +23,7 @@ The Arabic specification and supplied Ashour engineering plan guide this impleme
 - Visual-only effects (streak toasts, rank arrows, score deltas, wheel animation) are derived on the display from consecutive server snapshots and the server's `spinAt` timestamp. They never feed back into scoring, and the wheel lands on the category the server already chose.
 - English is available as an optional locale (`?lang=en`, or the language button in the console). The language is fixed per page load; layouts mirror automatically (logical CSS properties, direction-aware arrows). Arabic is the default and the reviewed copy.
 - Fractions use "7 من 15" ("7 of 15") instead of a bare slash so RTL readers cannot misread the order.
-- The demo seed uses visibly marked arithmetic placeholders, 48 sequential teams and 180 questions. It proves flow and distribution, not the quality of a competition bank.
+- The default bank uses all 112 questions from `أسئلة عاشور.xlsx` across 180 slots, reusing content across rounds with added multiple-choice distractors. Source difficulties are retained except hard questions assigned to joker slots. Gambler and tie-breaker answers are manually graded. The separate demo seed supports deterministic engine tests and rehearsals. Team names/codes remain sequential placeholders.
 - Local HTTP/WS with a PIN/device token is intended for a trusted wired LAN. The code does not provide public Internet authentication or TLS termination. Device-token authentication for admin HTTP exports is separate from the PIN input, and tokens are stored hashed in SQLite.
 
 Physical real-router rehearsal, Windows execution and actual WAN-disconnected testing cannot be certified by cloud/loopback/browser tests. Use `docs/rehearsal-checklist.md` before the event.

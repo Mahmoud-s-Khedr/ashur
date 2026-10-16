@@ -115,6 +115,8 @@ export const en: Record<keyof typeof ar, string> = {
   importHelp: 'Upload a file in the documented format. Validation errors appear before saving.',
   coverage: 'Question bank coverage',
   demoWarning: 'These questions are placeholders. Replace them before the event.',
+  bankReview:
+    'Review the questions, answers and generated choices before the event. Some questions repeat across rounds.',
   required: 'Required',
   available: 'Available',
   pool: 'Pool',
@@ -380,7 +382,7 @@ export const en: Record<keyof typeof ar, string> = {
   checkFirewall: 'Allow port 3000 through the firewall',
   checkSound: 'Enable sound from the display (one click)',
   checkFullscreen: 'Full screen on the display computer',
-  checkBank: 'Replace placeholder questions and complete all 180',
+  checkBank: 'Review the questions and answer choices and complete all 180 slots',
   checkCodes: 'Print and hand out the team code cards',
   checkBackup: 'Try downloading a backup',
   setup: 'Setup & devices',

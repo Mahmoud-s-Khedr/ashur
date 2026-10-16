@@ -12,6 +12,7 @@
     "build": "pnpm --filter @ashour/web build",
     "start": "tsx packages/server/src/index.ts",
     "seed": "tsx packages/server/src/seed.ts",
+    "questions:build": "tsx tools/build-questions.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "sim": "tsx tools/simulator.ts",

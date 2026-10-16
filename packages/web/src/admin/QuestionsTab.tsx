@@ -297,7 +297,11 @@ export function QuestionsTab({ s, send, bulk }: { s: Snapshot; send: Send; bulk:
   ] as const;
   return (
     <>
-      <div className="notice warning">{t.demoWarning}</div>
+      <div className="notice warning">
+        {questions.some((q) => q.explanation.includes('محتوى تجريبي'))
+          ? t.demoWarning
+          : t.bankReview}
+      </div>
       <div className="coverage-grid">
         {coverage.map(([st, required]) => {
           const count = questions.filter(

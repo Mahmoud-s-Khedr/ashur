@@ -32,6 +32,7 @@ async function boot() {
     cwd: process.cwd(),
     env: {
       ...process.env,
+      QUESTION_BANK: 'demo',
       ADMIN_PIN: pin,
       HOST: '127.0.0.1',
       PORT: String(port),

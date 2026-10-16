@@ -56,6 +56,6 @@ id,stage,pool,difficulty,category,type,body,options,correct,explanation,setNo
 121,2,main,hard,رياضة,text,أدخل الإجابة,[],"[""إجابة مقبولة""]",تصحيح يدوي,
 ```
 
-Replace seeded IDs 1–180 with your actual content, preserving the distribution. Appending 180 more questions does not remove the demo bank. You can also delete unused demo questions, import new content, and build sets explicitly by ID. A set builder verifies 3/3/3/1 and ten unique Stage-1 MCQs. Coverage cards count unused content by stage/pool; they do not verify factual accuracy or difficulty. Run a complete content review.
+The default seed already uses the workbook questions. To replace an older unused demo bank, import `packages/server/content/questions.json`; its IDs update slots 1–180. Appending questions without IDs does not remove existing content. You can also delete unused demo questions, import new content, and build sets explicitly by ID. A set builder verifies 3/3/3/1 and ten unique Stage-1 MCQs. Coverage cards count unused content by stage/pool; they do not verify factual accuracy or difficulty. Run a complete content review.
 
 Reserve content should include MCQs for Blitz leak replacement and text/numeric/speed questions for tie-breakers. Imports are capped at 1,000 questions or 200 teams per file and 2 MB HTTP body. Binary media and logos are not currently supported.
