@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, expect, type Browser, type Page } from '@playwright/test';
-import type { Server } from './e2e';
+import type { Server } from './test-harness';
 
 type Screen = { page: Page; state: any; name: string };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

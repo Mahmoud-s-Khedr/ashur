@@ -1700,7 +1700,9 @@ html.display-page body {
 }
 .strip-team {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
   align-items: center;
   gap: 0.8rem;
   flex: 1;
@@ -1718,8 +1720,15 @@ html.display-page body {
     border-color 0.4s,
     box-shadow 0.4s;
 }
+.strip-team > div {
+  min-width: 0;
+}
+.strip-team .chip {
+  white-space: normal;
+}
 .strip-team h3 {
   margin: 0;
+  overflow-wrap: anywhere;
   font-size: 1.25rem;
   font-weight: 800;
 }
@@ -1733,8 +1742,9 @@ html.display-page body {
 }
 .strip-score {
   position: relative;
+  grid-column: 1 / -1;
+  justify-content: center;
   flex-direction: row-reverse;
-  margin-inline-start: auto;
   display: flex;
   align-items: center;
   gap: 0.6rem;

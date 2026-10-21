@@ -62,14 +62,155 @@ pnpm typecheck
 pnpm test         # scoring, engine, full 48-team tournament, import and timer tests
 pnpm build
 pnpm sim          # real WS clients; all stages, reconnect, crash, load and exports
-pnpm e2e          # full manual/auto tournaments, faults, backup restore, admin + four team browsers
+pnpm e2e          # real-bank + demo manual/auto tournaments, faults, backup restore, browser workflows
 pnpm smoke        # Chromium admin/play/display checks
-pnpm tour         # plays a whole tournament with bots and saves screenshots to ./tour-shots (TOUR_LANG=en for English)
+pnpm tour         # full bot tournament + state-checked screenshots (TOUR_LANG=en for English)
+pnpm audit:launch # all checks, four full tours and tie tour; dated evidence under test-results/
 ```
 
-Browser checks use `/usr/bin/chromium` if installed. Otherwise run `pnpm exec playwright install chromium`, or set `CHROMIUM_PATH` to your browser executable. Browser tests and the simulator use separate temporary databases and test-only PINs. Build before `sim` or `smoke`. Production assets never depend on Vite.
+### Run everything and generate all screenshot evidence
 
-Build before `e2e` too. It creates disposable servers/databases, asserts every round's scores and qualifications in two full 48-team tournaments, then exercises operational failures, simultaneous final finishes, the Linux supervisor and all three stages through four independent team browsers, an admin and a projector. It writes a JSON report, exports and screenshots to a printed temporary directory; set `E2E_OUT=test-results/e2e` to retain evidence in the workspace. To investigate a subset, use `E2E_ONLY=tournaments`, `operations`, `faults`, `supervisor`, `arbitration` or `browser`. Printing checks verify generated content with the native print dialog stubbed; projector audio checks verify browser activation, not physical speakers. Actual venue networking and hardware still require the rehearsal checklist.
+From the repository root, install dependencies and Chromium once, then run the aggregate audit:
+
+```bash
+pnpm install
+pnpm exec playwright install chromium
+pnpm audit:launch
+```
+
+Use Linux for the full audit: the E2E suite includes a Linux supervisor recovery scenario. Windows execution remains pending verification. Tests create their own servers, dynamically allocated ports, temporary databases and test-only admin PINs; no running development server or manual competition setup is required. The event database and bundled question content are preserved.
+
+The audit runs these checks sequentially:
+
+| Check           | Coverage                                                                        |
+| --------------- | ------------------------------------------------------------------------------- |
+| `typecheck`     | TypeScript validation                                                           |
+| `test`          | Unit, scoring, engine, import and timer tests                                   |
+| `build`         | Production web assets used by subsequent checks                                 |
+| `sim`           | Real WebSocket clients, competition stages, reconnect, crash, load and exports  |
+| `smoke`         | Arabic and English browser checks, including admin/team/projector screens       |
+| `e2e`           | All eight scenarios, including three complete tournaments and browser workflows |
+| Four full tours | Arabic RTL and English LTR, each in manual and automatic modes                  |
+| Tie tour        | Readiness, two all-wrong tie questions, then earliest-correct-answer resolution |
+
+The audit builds production assets automatically. When running `sim`, `smoke`, `e2e` or `tour` separately, run `pnpm build` first. Production assets never depend on Vite.
+
+### Find screenshots and reports
+
+By default, each audit creates a fresh dated directory and prints its location:
+
+```text
+test-results/launch-audit-<timestamp>/
+  index.html          # Screenshot gallery grouped by stage and role; check/log links
+  report.json         # Aggregate status, individual checks and run metadata
+  *.log               # Output from each check
+  working-tree.patch  # Tracked changes relative to HEAD
+  harness/            # Test harness sources for this run
+  smoke/              # Browser smoke artifacts, including screenshot checkpoints
+  e2e/                # Scenario report, browser PNGs, exports and server logs
+  tour-ar-manual/     # PNG captures, report.json and server.log
+  tour-ar-auto/
+  tour-en-manual/
+  tour-en-auto/
+  tour-tie/
+```
+
+Open the printed directory's **`index.html`** in a browser, then click a thumbnail for the full-size image. Keep the entire directory together when sharing the gallery because its image and report links are relative. Smoke and E2E screenshots are available in their respective subdirectories; the gallery embeds tour images.
+
+Tours capture the admin console, a **390 × 844** competitor screen and a **1920 × 1080** projector. They cover rules, readiness, countdown, questions, pause, reconnect, results, stage progression and champion, plus Gambler wheel/cards/audience/reveal and Final Climb audience/reveal. Captures wait for the expected state, visible controls, settled entrance animations and authoritative scores. Each tour report records the capture's stage, round, role, phase, locale and snapshot version.
+
+The [documented successful verification](docs/e2e-report.md) produced **102 captures per full tour + 45 tie captures = 453 tour screenshots**, plus browser test images. This is a recorded baseline; use the fresh run's reports to confirm its actual capture count and status. Backend-only tests have no UI image, and browser tests take screenshots at explicit checkpoints. Use the full audit for the broadest existing visual coverage.
+
+`report.json` records the commit, dirty-tree status, runtime versions and question-bank hash. A completed audit passes only when every check passes; failed checks produce a nonzero exit status. A failed production build marks dependent browser/simulator/E2E/tour checks as skipped. Missing or failed E2E/tour reports also fail the audit. An interrupted run remains labelled `incomplete`; inspect its existing logs and report, since the gallery is written at the end. Failures retain available diagnostic artifacts, including browser screenshots and tour HTML/state/server logs.
+
+### Run E2E separately
+
+The full E2E suite checks every round's scores and qualifications in three complete 48-team tournaments: the unchanged bundled real bank in manual mode, demo manual mode, and demo automatic mode with the 15-question final fallback. It also covers imports, draw, permissions, emergency controls, tie corrections, backup restoration, authentication, seat limits, paused countdown, crash recovery, deadlines, protocol limits, Linux supervisor recovery and simultaneous final finishes.
+
+The browser scenario exercises all three stages with four independent team browser identities, an admin and a projector, including reconnect, corrections, downloads and printing. Tours reuse four competitor identities, with one transferred to the narrow browser UI.
+
+For a full E2E run with evidence retained in the workspace (Bash):
+
+```bash
+pnpm build
+E2E_OUT="test-results/e2e-$(date +%Y%m%d-%H%M%S)" pnpm e2e
+```
+
+Without `E2E_OUT`, evidence goes to a printed temporary directory. Open the output directory's `report.json` for per-scenario results and inspect its PNGs, exports, downloaded CSV/JSON/SQLite files and logs.
+
+To investigate one subset:
+
+```bash
+E2E_ONLY=browser E2E_OUT="test-results/browser-$(date +%Y%m%d-%H%M%S)" pnpm e2e
+```
+
+| `E2E_ONLY`    | Scenarios selected                                                                        |
+| ------------- | ----------------------------------------------------------------------------------------- |
+| `tournaments` | All three complete tournament scenarios                                                   |
+| `operations`  | Imports, draw, permissions, emergency controls, tie corrections and backup restore        |
+| `faults`      | Authentication, seat limits, countdown pause, active crash, deadlines and protocol limits |
+| `supervisor`  | Linux supervisor restart and clean shutdown                                               |
+| `arbitration` | Simultaneous final finishes and earliest correct server receipt                           |
+| `browser`     | Admin tools, four teams, projector, reconnect, corrections, downloads and printing        |
+
+Omit `E2E_ONLY` to run the entire suite. The aggregate audit clears this selector automatically.
+
+### Generate individual screenshot tours
+
+Build once, then choose the tour you need. These Bash examples use fresh output directories:
+
+```bash
+pnpm build
+
+# Arabic, manual (the default)
+TOUR_OUT="test-results/tour-ar-manual-$(date +%Y%m%d-%H%M%S)" pnpm tour
+
+# English, manual
+TOUR_LANG=en TOUR_OUT="test-results/tour-en-manual-$(date +%Y%m%d-%H%M%S)" pnpm tour
+
+# Arabic, automatic
+TOUR_AUTO=1 TOUR_OUT="test-results/tour-ar-auto-$(date +%Y%m%d-%H%M%S)" pnpm tour
+
+# English, automatic
+TOUR_LANG=en TOUR_AUTO=1 TOUR_OUT="test-results/tour-en-auto-$(date +%Y%m%d-%H%M%S)" pnpm tour
+
+# Dedicated Arabic tie-breaker tour
+TOUR_SCENARIO=tie TOUR_OUT="test-results/tour-tie-$(date +%Y%m%d-%H%M%S)" pnpm tour
+```
+
+Standalone tours write PNGs, `report.json` and `server.log` to `TOUR_OUT` (default: `tour-shots/`). The combined HTML gallery is generated by `pnpm audit:launch`. Each full tour must include the required captures and reach champion; `TOUR_ONLY` is rejected because partial tours cannot count as complete.
+
+### Output and browser configuration
+
+| Variable                | Purpose / default                                                                 |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| `AUDIT_OUT`             | Aggregate evidence directory; defaults to a dated directory under `test-results/` |
+| `AUDIT_BASELINE`        | Optional existing evidence directory to copy into the audit's `baseline/`         |
+| `E2E_OUT`               | Standalone E2E evidence directory; defaults to a temporary directory              |
+| `E2E_ONLY`              | Optional E2E subset from the table above                                          |
+| `PLAYWRIGHT_OUTPUT_DIR` | Standalone smoke artifacts; defaults to `test-results/smoke`                      |
+| `TOUR_OUT`              | Standalone tour evidence directory; defaults to `tour-shots/`                     |
+| `TOUR_LANG`             | `en` for English; otherwise Arabic                                                |
+| `TOUR_AUTO`             | `1` for automatic mode; otherwise manual                                          |
+| `TOUR_SCENARIO`         | `tie` for the dedicated tie scenario; otherwise a full tournament                 |
+| `TOUR_BANK`             | Standalone tour question bank; defaults to `demo`                                 |
+| `CHROMIUM_PATH`         | Optional explicit Chromium executable path                                        |
+
+The audit sets its own E2E/smoke/tour output paths and tour language, mode, scenario and demo bank. Use `AUDIT_OUT` to choose its root, and always choose a fresh directory for each run to avoid mixing old and new evidence:
+
+```bash
+AUDIT_OUT="test-results/full-$(date +%Y%m%d-%H%M%S)" pnpm audit:launch
+```
+
+Browser checks use `CHROMIUM_PATH` when set, then try `/usr/bin/chromium` and `/opt/pw-browsers/chromium`, then Playwright's installed browser. If a browser executable is missing, run `pnpm exec playwright install chromium`. On Linux hosts missing browser system libraries, use `pnpm exec playwright install --with-deps chromium` (system package installation may require administrator access). To use a specific installed browser:
+
+```bash
+CHROMIUM_PATH=/path/to/chromium pnpm audit:launch
+```
+
+If a standalone browser check cannot load production assets, rerun `pnpm build` before retrying. For any failed check, start with its log and `report.json`, then inspect retained failure screenshots and tour HTML/state. Rerun into a fresh output directory after fixing the cause. Generated evidence under `test-results/` is ignored by Git.
+
+Printing checks verify generated content with the native print dialog stubbed; projector audio checks verify browser activation, not physical speakers. Actual venue networking, physical projector readability, audible sound, WAN-disconnected operation and Windows execution still require the [rehearsal checklist](docs/rehearsal-checklist.md).
 
 The simulator's arrival-spread measurements use local loopback. They do **not** establish LAN timing. There is no physically achievable zero-latency guarantee: measure the actual router and computers during rehearsal. The target from the plan is under 5 ms spread.
 

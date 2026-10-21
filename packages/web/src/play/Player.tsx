@@ -203,7 +203,8 @@ function Question({
   }, [connected, error]);
   const c = s.settings;
   const locked = s.submitted || sent !== null;
-  const total = s.stage === 1 ? c.blitzMs : c.questionMs;
+  const tie = s.phase === 'TIE_RUNNING';
+  const total = s.stage === 1 && !tie ? c.blitzMs : c.questionMs;
   const diffLabel =
     q.difficulty === 'joker'
       ? `${t.joker} · +${c.jokerCorrect} / ${c.jokerWrong}`
@@ -252,17 +253,15 @@ function Question({
             {t.card} <b className="num">{s.ownCard}</b>
           </span>
         )}
-        <span className="chip q-no">
-          <Of a={idx + 1} b={count} />
-        </span>
+        <span className="chip q-no">{tie ? t.tiebreaker : <Of a={idx + 1} b={count} />}</span>
       </div>
-      {s.stage === 1 && <Pips total={count} done={idx} current />}
+      {s.stage === 1 && !tie && <Pips total={count} done={idx} current />}
       <h1 className="q-text">{q.body}</h1>
       {locked ? (
         <div className="locked">
           <Lock />
           <b>{t.submitted}</b>
-          <small>{s.stage === 1 ? t.nextComing : t.watchScreen}</small>
+          <small>{s.stage === 1 && !tie ? t.nextComing : t.watchScreen}</small>
         </div>
       ) : q.type === 'mcq' ? (
         <div className="options" role="group">

@@ -290,8 +290,12 @@ describe('M3 Gambler', () => {
     expect(engine.elapsed()).toBe(0);
     expect(engine.state.remainingMs).toBe(engine.state.settings.questionMs);
     expect(engine.state.cards).toEqual({ 1: 5, 2: 5, 3: 5, 4: 5 });
+    const resumedAt = Date.now();
     engine.dispatch('round.resume', {}, admin);
-    expect(engine.state.endsAt).toBe(Date.now() + engine.state.settings.questionMs);
+    expect(engine.state.endsAt).toBeGreaterThanOrEqual(
+      resumedAt + engine.state.settings.questionMs,
+    );
+    expect(engine.state.endsAt).toBeLessThanOrEqual(Date.now() + engine.state.settings.questionMs);
     clock = 71000;
     expect(engine.elapsed()).toBe(1000);
   });

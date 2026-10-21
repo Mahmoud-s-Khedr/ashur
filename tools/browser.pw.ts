@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-const pin = 'browser-demo-pin';
+const pin = process.env.SMOKE_PIN!;
 test('Arabic admin, team and display screens work without external runtime requests', async ({
   browser,
   page,
@@ -102,7 +102,7 @@ test('Arabic admin, team and display screens work without external runtime reque
   );
   expect(errors).toEqual([]);
   expect(
-    requests.every((url) => url.startsWith('http://127.0.0.1:3101') || url.startsWith('data:')),
+    requests.every((url) => url.startsWith(process.env.SMOKE_URL!) || url.startsWith('data:')),
   ).toBe(true);
   await context.close();
 });

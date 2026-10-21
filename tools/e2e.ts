@@ -1,190 +1,17 @@
 /** Real-server end-to-end checks. Every scenario owns a disposable database and port. */
 import assert from 'node:assert/strict';
-import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { createServer } from 'node:net';
+import { execFileSync } from 'node:child_process';
+import { writeFileSync, readdirSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
+
 import { browserOperations } from './e2e-browser';
+import { Server, Client, output, results, sleep, until } from './test-harness';
+import { tournament, seat, begin } from './tournament';
 
-const output = resolve(process.env.E2E_OUT || mkdtempSync(join(tmpdir(), 'ashour-e2e-')));
-mkdirSync(output, { recursive: true });
-const results: { scenario: string; status: string; durationMs: number; detail?: string }[] = [];
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-async function until(test: () => unknown | Promise<unknown>, label: string, timeout = 15000) {
-  const end = Date.now() + timeout;
-  while (!(await test())) {
-    if (Date.now() > end) throw new Error(`Timeout: ${label}`);
-    await sleep(20);
-  }
-}
-
-export class Server {
-  evidence = output;
-  dir = mkdtempSync(join(tmpdir(), 'ashour-e2e-db-'));
-  pin = randomUUID();
-  port = 0;
-  process?: ChildProcess;
-  log = '';
-  clients: Client[] = [];
-  get url() {
-    return `http://127.0.0.1:${this.port}`;
-  }
-  async start(dbPath = join(this.dir, 'test.sqlite'), supervised = false) {
-    if (!this.port)
-      this.port = await new Promise<number>((r) => {
-        const s = createServer();
-        s.listen(0, '127.0.0.1', () => {
-          const port = (s.address() as { port: number }).port;
-          s.close(() => r(port));
-        });
-      });
-    this.process = spawn(
-      process.execPath,
-      supervised ? ['tools/supervise.mjs'] : ['--import', 'tsx', 'packages/server/src/index.ts'],
-      {
-        env: {
-          ...process.env,
-          QUESTION_BANK: 'demo',
-          HOST: '127.0.0.1',
-          PORT: String(this.port),
-          ADMIN_PIN: this.pin,
-          DB_PATH: dbPath,
-          BACKUP_DIR: join(this.dir, 'backups'),
-        },
-        stdio: ['ignore', 'pipe', 'pipe'],
-      },
-    );
-    for (const stream of [this.process.stdout, this.process.stderr])
-      stream?.on('data', (data) => (this.log += String(data)));
-    await until(async () => {
-      if (this.process?.exitCode !== null) throw new Error(this.log);
-      return fetch(this.url + '/health')
-        .then((r) => r.ok)
-        .catch(() => false);
-    }, 'server boot');
-  }
-  async stop(signal: NodeJS.Signals = 'SIGTERM') {
-    for (const c of this.clients) c.ws?.terminate();
-    if (this.process && this.process.exitCode === null && this.process.signalCode === null) {
-      this.process.kill(signal);
-      await until(
-        () => this.process?.exitCode !== null || this.process?.signalCode !== null,
-        'server stop',
-      );
-    }
-  }
-  async client(role: 'admin' | 'team' | 'display') {
-    const c = new Client(this, role);
-    this.clients.push(c);
-    await c.connect();
-    return c;
-  }
-}
-class Client {
-  id = randomUUID();
-  token?: string;
-  s: any;
-  ws!: WebSocket;
-  pending = new Map<
-    string,
-    { acknowledged: boolean; resolve: () => void; reject: (e: Error) => void }
-  >();
-  constructor(
-    public server: Server,
-    public role: 'admin' | 'team' | 'display',
-  ) {}
-  async connect() {
-    this.s = undefined;
-    this.ws = new WebSocket(this.server.url.replace('http', 'ws') + '/ws');
-    this.ws.on('error', () => {});
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Authentication timeout')), 5000);
-      this.ws.on('open', () =>
-        this.ws.send(
-          JSON.stringify({
-            v: 1,
-            type: 'hello',
-            payload: {
-              role: this.role,
-              deviceId: this.id,
-              deviceToken: this.token,
-              ...(this.role === 'admin' ? { pin: this.server.pin } : {}),
-            },
-          }),
-        ),
-      );
-      this.ws.on('message', (raw) => {
-        const m = JSON.parse(String(raw));
-        if (m.type === 'hello.ok') this.token = m.payload.deviceToken;
-        if (m.type === 'state.snapshot') {
-          this.s = m.payload;
-          clearTimeout(timer);
-          resolve();
-          for (const [id, p] of this.pending)
-            if (p.acknowledged) {
-              this.pending.delete(id);
-              p.resolve();
-            }
-        }
-        if (m.type === 'command.ack') {
-          const p = this.pending.get(m.payload.cmdId);
-          if (p) p.acknowledged = true;
-        }
-        if (m.type === 'error') {
-          const p = this.pending.get(m.payload.cmdId);
-          if (p) {
-            this.pending.delete(m.payload.cmdId);
-            p.reject(new Error(m.payload.message));
-          } else if (!this.s) {
-            clearTimeout(timer);
-            reject(new Error(m.payload.message));
-          }
-        }
-      });
-    });
-  }
-  async cmd(type: string, payload: object = {}, cmdId = randomUUID()) {
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(cmdId);
-        reject(new Error(`Command timeout: ${type}`));
-      }, 8000);
-      this.pending.set(cmdId, {
-        acknowledged: false,
-        resolve: () => {
-          clearTimeout(timer);
-          resolve();
-        },
-        reject: (e) => {
-          clearTimeout(timer);
-          reject(e);
-        },
-      });
-      this.ws.send(JSON.stringify({ v: 1, type, cmdId, payload }));
-    });
-  }
-  async bulk(type: string, payload: object, ok = true) {
-    const r = await fetch(this.server.url + '/api/command', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, payload, cmdId: randomUUID() }),
-    });
-    const body = await r.json();
-    assert.equal(r.ok, ok, JSON.stringify(body));
-    return body;
-  }
-  async export() {
-    return fetch(this.server.url + '/api/export', {
-      headers: { Authorization: `Bearer ${this.token}` },
-    }).then((r) => r.json());
-  }
-}
-
-async function scenario(name: string, run: (s: Server) => Promise<void>) {
-  const s = new Server();
+async function scenario(name: string, run: (s: Server) => Promise<void>, bank = 'demo') {
+  const s = new Server(bank);
   const start = Date.now();
   try {
     await s.start();
@@ -202,126 +29,11 @@ async function scenario(name: string, run: (s: Server) => Promise<void>) {
     console.error(`FAIL ${name}:`, e);
   } finally {
     await s.stop();
+    writeFileSync(join(output, name.replace(/[^a-z0-9]+/gi, '-') + '.log'), s.log);
     rmSync(s.dir, { recursive: true, force: true });
     writeFileSync(join(output, 'report.json'), JSON.stringify(results, null, 2));
   }
 }
-async function seat(admin: Client, teams: Client[]) {
-  const ids = admin.s.lineup.map((t: any) => t.id);
-  for (let i = 0; i < teams.length; i++) {
-    if (teams[i].s.team) await teams[i].cmd('team.checkout');
-    if (i < ids.length) {
-      const code = admin.s.teams.find((t: any) => t.id === ids[i]).code;
-      await teams[i].cmd('team.checkin', { code });
-      await teams[i].cmd('team.ready');
-    }
-  }
-}
-async function begin(admin: Client, teams: Client[], auto = false) {
-  await admin.cmd('round.showRules');
-  await admin.cmd('lineup.announce');
-  await seat(admin, teams);
-  if (!auto) await admin.cmd('round.start');
-  await until(() => ['RUNNING', 'WHEEL', 'CARD_PICK'].includes(admin.s.phase), 'round start');
-}
-async function answer(admin: Client, team: Client, right: boolean) {
-  await until(() => !!team.s.question && !team.s.submitted, 'team question');
-  const q = team.s.question;
-  assert(!('correct' in q) && !('explanation' in q), 'Team received model answer');
-  await team.cmd('answer.submit', {
-    roundQuestionId: q.id,
-    answer: q.type === 'mcq' ? (right ? 1 : 0) : right ? '4' : 'wrong',
-  });
-}
-
-async function tournament(s: Server, auto: boolean) {
-  const admin = await s.client('admin'),
-    display = await s.client('display');
-  const teams = await Promise.all(Array.from({ length: 4 }, () => s.client('team')));
-  const bank = admin.s.questions.map((q: any) => ({
-    ...q,
-    body: `E2E ${q.id}: What is 2 + 2?`,
-    options: q.type === 'mcq' ? ['3', '4', '5', '6'] : [],
-    correct: q.type === 'mcq' ? 1 : ['4'],
-  }));
-  await admin.bulk('questions.save', { questions: bank });
-  await admin.cmd('settings.update', {
-    settings: { automation: auto ? 'auto' : 'manual', countdownMs: 5, autoDelayMs: 5 },
-  });
-  const winners: number[] = [];
-  for (let round = 0; round < 16; round++) {
-    await begin(admin, teams, auto);
-    const ids = admin.s.lineup.map((t: any) => t.id);
-    const stage = admin.s.stage;
-    const count = stage === 1 ? 10 : stage === 2 ? 8 : auto ? 15 : 10;
-    for (let index = 0; index < count; index++) {
-      if (stage === 2) {
-        if (!auto) await admin.cmd('wheel.spin');
-        await until(() => admin.s.phase === 'CARD_PICK', 'cards');
-        for (const team of teams) {
-          assert.equal(team.s.question, null);
-          await team.cmd('card.select', { value: 15 });
-        }
-        if (!auto) await admin.cmd('question.start');
-      }
-      await until(
-        () => admin.s.phase === 'RUNNING' && admin.s.index === (stage === 1 ? 0 : index),
-        'question running',
-      );
-      for (let i = 0; i < ids.length; i++)
-        await answer(admin, teams[i], i === 0 && (stage !== 3 || !auto || index % 2 === 0));
-      if (stage !== 1) {
-        await until(
-          () => ['AUDIENCE', 'REVEAL', 'RESULTS'].includes(admin.s.phase),
-          'collection closes',
-        );
-        if (admin.s.phase === 'AUDIENCE') {
-          await until(() => !!display.s.question, 'audience question');
-          assert(!('correct' in display.s.question));
-        }
-        for (const a of admin.s.answers.filter((a: any) => a.verdict === 'pending'))
-          await admin.cmd('grade.set', {
-            answerId: a.id,
-            verdict:
-              a.teamId === ids[0] && (stage !== 3 || !auto || index % 2 === 0)
-                ? 'correct'
-                : 'wrong',
-          });
-        if (!auto) await admin.cmd('question.reveal');
-        await until(() => admin.s.phase !== 'AUDIENCE', 'reveal');
-        if (index + 1 < count && !auto) await admin.cmd('question.next');
-      }
-    }
-    await until(() => admin.s.phase === 'RESULTS', 'round results');
-    assert.equal(admin.s.winner, ids[0]);
-    const expected = stage === 1 ? 96 : stage === 2 ? 120 : auto ? 1 : 10;
-    assert.equal(admin.s.lineup[0].score, expected);
-    for (const t of admin.s.lineup.slice(1))
-      assert.equal(t.score, stage === 1 ? 10 : stage === 2 ? -120 : 0);
-    winners.push(ids[0]);
-    if (round < 15) await admin.cmd('round.next');
-    console.log(
-      `  ${auto ? 'auto' : 'manual'} round ${round + 1}/16: winner ${ids[0]}, score ${expected}`,
-    );
-  }
-  const data = await admin.export();
-  assert(data.state.rounds.every((r: any) => r.completed));
-  assert.equal(data.teams.filter((t: any) => t.status === 'champion').length, 1);
-  assert.equal(data.answers.length, auto ? 621 : 606);
-  assert.deepEqual(
-    winners.slice(0, 12),
-    Array.from({ length: 12 }, (_, i) => 4 * i + 1),
-  );
-  assert.deepEqual(winners.slice(12, 15), [1, 17, 33]);
-  assert.equal(winners[15], 1);
-  await assert.rejects(admin.cmd('round.next'), /finished/);
-  await assert.rejects(admin.cmd('score.adjust', { teamId: 1, delta: 5, reason: 'Too late' }));
-  writeFileSync(
-    join(output, `tournament-${auto ? 'auto' : 'manual'}.json`),
-    JSON.stringify(data, null, 2),
-  );
-}
-
 async function operations(s: Server) {
   const admin = await s.client('admin'),
     display = await s.client('display');
@@ -759,6 +471,7 @@ assert(
   'Unknown E2E_ONLY scenario',
 );
 if (!selection || selection === 'tournaments') {
+  await scenario('Full bundled real-bank tournament', (s) => tournament(s, false), 'real');
   await scenario('Full 48-team manual tournament with exact scores', (s) => tournament(s, false));
   await scenario('Full 48-team automatic tournament with 15-question final fallback', (s) =>
     tournament(s, true),

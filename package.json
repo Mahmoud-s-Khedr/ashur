@@ -21,7 +21,8 @@
     "smoke": "playwright test -c playwright.config.ts",
     "tour": "tsx tools/tour.ts",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "audit:launch": "tsx tools/launch-audit.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
