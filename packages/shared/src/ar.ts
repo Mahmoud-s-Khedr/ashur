@@ -378,6 +378,10 @@ export const ar = {
   checkCodes: 'طباعة بطاقات أكواد الفرق وتوزيعها',
   checkBackup: 'تجربة تنزيل نسخة احتياطية',
   setup: 'الإعداد والأجهزة',
+  resetCompetition: 'إعادة المسابقة من البداية',
+  confirmResetCompetition:
+    'هل أنت متأكد؟ سيتم تصفير كل الجولات والنقاط والفرق المتأهلة وإعادة استخدام الأسئلة للبدء من جديد.',
+  jumpStage: 'الانتقال السريع للمراحل',
 };
 export const phaseNames: Record<string, string> = {
   IDLE: 'تحضير',
@@ -426,6 +430,8 @@ export const ackLabels: Record<string, string> = {
   'display.scene': 'تغيّر المشهد',
   'automation.set': 'تغيّر نمط التشغيل',
   'round.select': 'اختيرت الجولة',
+  'stage.jump': 'انتقلنا إلى المرحلة',
+  'competition.reset': 'أُعيدت المسابقة من البداية',
   'question.reroll': 'أُعيد اختيار المجال',
 };
 

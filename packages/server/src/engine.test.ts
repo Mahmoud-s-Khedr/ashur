@@ -727,6 +727,22 @@ describe('presentation support', () => {
     );
     expect(engine.logo(1)?.logo).toBeNull();
     expect(engine.teams()[0].logoV).toBe(0);
+    start('1-1');
+    engine.dispatch('stage.jump', { stage: 2 }, admin);
+    expect(engine.round.key).toBe('2-1');
+    expect(engine.round.stage).toBe(2);
+    expect(engine.state.phase).toBe('IDLE');
+    expect(engine.round.teamIds).toEqual([1, 2, 3, 4]);
+    engine.dispatch('stage.jump', { stage: 3 }, admin);
+    expect(engine.round.key).toBe('3-1');
+    expect(engine.round.stage).toBe(3);
+    expect(engine.round.teamIds).toEqual([1, 2, 3]);
+    engine.dispatch('competition.reset', {}, admin);
+    expect(engine.round.key).toBe('1-1');
+    expect(engine.state.phase).toBe('IDLE');
+    expect(engine.state.rounds.find((r) => r.key === '2-1')!.teamIds).toEqual([]);
+    expect(engine.questions().every((q) => !q.used)).toBe(true);
+    expect(engine.teams().every((t) => t.status === 'active')).toBe(true);
     expect(() =>
       engine.dispatch(
         'teams.save',

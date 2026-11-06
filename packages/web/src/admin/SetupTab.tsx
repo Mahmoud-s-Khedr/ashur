@@ -130,6 +130,14 @@ export function SetupTab({ s, send }: { s: Snapshot; send: Send }) {
             }}
           >
             {t.resetDevices}
+          </button>{' '}
+          <button
+            className="danger-outline"
+            onClick={() => {
+              if (confirm(t.confirmResetCompetition)) send('competition.reset');
+            }}
+          >
+            {t.resetCompetition}
           </button>
         </Section>
       </div>

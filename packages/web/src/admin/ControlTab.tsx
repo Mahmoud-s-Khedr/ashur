@@ -301,6 +301,14 @@ function Emergency({ s, send }: { s: Snapshot; send: Send }) {
         >
           {t.resetDevices}
         </button>
+        <button
+          className="danger-outline"
+          onClick={() => {
+            if (confirm(t.confirmResetCompetition)) send('competition.reset');
+          }}
+        >
+          {t.resetCompetition}
+        </button>
         {s.phase === 'CARD_PICK' && (
           <>
             <button onClick={() => send('question.reroll')}>{t.reroll}</button>
@@ -577,6 +585,41 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
         </div>
       </div>
       <div className="control-side">
+        <Section title={t.jumpStage}>
+          <div className="action-row">
+            {[
+              [1, t.blitz],
+              [2, t.gambler],
+              [3, t.climb],
+            ].map(([st, name]) => (
+              <button
+                className={s.stage === st ? 'selected' : ''}
+                key={st}
+                onClick={() => send('stage.jump', { stage: st })}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+          <div className="form-inline" style={{ marginTop: 10, marginBottom: 0 }}>
+            <label className="grow">
+              {t.selectRound}
+              <select
+                value={s.roundKey}
+                disabled={!['IDLE', 'RESULTS'].includes(s.phase)}
+                onChange={(e) => send('round.select', { key: e.target.value })}
+              >
+                {s.rounds.map((r) => (
+                  <option key={r.key} value={r.key} disabled={!!r.completed}>
+                    {stageName(r.stage)}{' '}
+                    {r.stage !== 3 ? `· ${r.stage === 2 ? t.groupLabel : t.round} ${r.seq}` : ''}{' '}
+                    {r.completed ? `(${t.closed})` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </Section>
         <LineupPicker s={s} send={send} />
         <Emergency s={s} send={send} />
         <Section title={t.scene}>
