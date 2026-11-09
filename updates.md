@@ -53,16 +53,17 @@ Status: **Not started** · **In progress** · **Done** · **Blocked**
 
 ## 5. Show Gambler question on projector (request 15)
 
-**Status:** Not started  
-**Commit:** —
+**Status:** Done  
+**Commit:** 70887f8
 
-- [ ] Make the current Gambler question available to the projector after wager selection, while teams are answering; keep the model answer hidden until reveal.
-- [ ] Update the projector layout to show the question alongside useful timer and team information.
-- [ ] Verify question visibility before and after wagers, during answering and at reveal, including refresh/reconnect and both languages.
-- [ ] Commit this request separately.
+- [x] Make the current Gambler question available to the projector after wager selection, while teams are answering; keep the model answer hidden until reveal.
+- [x] Update the projector layout to show the question alongside useful timer and team information.
+- [x] Verify question visibility before and after wagers, during answering and at reveal, including refresh/reconnect and both languages.
+- [x] Commit this request separately.
 
 ## Progress log
 
 - Request 1 completed in `ac10140`; Arabic and English player rendering, Blitz labels, type checking and production build verified.
 - Request 2 completed in `11be84f`; seed tests, written-answer grading, type checking and production build verified.
 - Request 3 completed in `3382ebe`; operator-entered questions, answer privacy, restart and progression guards, browser flow, simulator and real/demo manual and automatic tournaments verified.
+- Request 5 completed in `70887f8`; projector snapshot visibility across wagers, restart and reveal, Arabic and English rendering, type checking and production build verified.
