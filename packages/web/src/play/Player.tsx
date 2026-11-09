@@ -177,7 +177,7 @@ function TimerBar({
   );
 }
 
-function Question({
+export function Question({
   s,
   send,
   remaining,
@@ -243,7 +243,7 @@ function Question({
       <TimerBar remaining={remaining} total={total} paused={s.paused} />
       <div className="q-top">
         <span className="chip">{q.category}</span>
-        {diffLabel && (
+        {s.stage !== 2 && diffLabel && (
           <span className={`chip diff ${q.difficulty}`}>
             {q.difficulty === 'joker' && <Joker />} {diffLabel}
           </span>
