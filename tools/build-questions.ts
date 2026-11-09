@@ -77,7 +77,7 @@ for (let i = 0; i < 24; i++) {
 }
 for (let i = 0; i < 15; i++) {
   const row = rest[next++ % rest.length];
-  add(row, 3, 'main', row.difficulty as Question['difficulty']);
+  add(row, 3, 'main', row.difficulty as Question['difficulty'], null, 'text');
 }
 for (let i = 0; i < 21; i++) {
   const row = queues.hard[i % queues.hard.length];

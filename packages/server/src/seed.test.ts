@@ -9,6 +9,7 @@ import source from '../content/ashour-source.json';
 import questions from '../content/questions.json';
 import { openDb } from './db';
 import { seed } from './seed';
+import { seed as seedDemo } from './demo-seed';
 import { Engine } from './engine';
 
 const admin = { role: 'admin' as const, deviceId: 'content-test' };
@@ -66,6 +67,11 @@ describe('workbook question bank', () => {
   it('provides complete rounds and usable harder reserves', () => {
     expect(questions.filter((q) => q.stage === 2)).toHaveLength(24);
     expect(questions.filter((q) => q.stage === 3)).toHaveLength(15);
+    expect(
+      questions
+        .filter((q) => q.stage === 2 || q.stage === 3)
+        .every((q) => q.type === 'text' && q.options.length === 0),
+    ).toBe(true);
     expect(questions.filter((q) => q.pool === 'tiebreaker')).toHaveLength(10);
     const reserves = questions.filter((q) => q.pool === 'reserve');
     expect(reserves).toHaveLength(11);
@@ -79,6 +85,32 @@ describe('workbook question bank', () => {
           (d) => set.filter((q) => q.difficulty === d).length,
         ),
       ).toEqual([3, 3, 3, 1]);
+    }
+  });
+
+  it('seeds written answers for both later stages in the demo bank', () => {
+    const db = openDb(':memory:');
+    try {
+      seedDemo(db);
+      const bank = new Engine(db).questions();
+      for (const [stage, count] of [
+        [2, 24],
+        [3, 15],
+      ]) {
+        const rows = bank.filter((q) => q.stage === stage);
+        expect(rows).toHaveLength(count);
+        expect(
+          rows.every(
+            (q) =>
+              q.type === 'text' &&
+              q.options.length === 0 &&
+              Array.isArray(q.correct) &&
+              q.correct.length > 0,
+          ),
+        ).toBe(true);
+      }
+    } finally {
+      db.close();
     }
   });
 

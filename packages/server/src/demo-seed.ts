@@ -46,10 +46,10 @@ export function seed(db: ReturnType<typeof openDb>) {
           pool: 'main',
           difficulty: 'hard',
           category: categories[j % 4],
-          type: j % 3 === 0 ? 'text' : 'mcq',
+          type: 'text',
           body: `سؤال تجريبي للمرحلة ${stage} رقم ${j + 1}: ما ناتج ${j + 1} + 1؟`,
-          options: j % 3 === 0 ? [] : [String(j + 2), '0', '1', '99'],
-          correct: j % 3 === 0 ? [String(j + 2)] : 0,
+          options: [],
+          correct: [String(j + 2)],
           explanation: 'محتوى تجريبي.',
           setNo: null,
         });
