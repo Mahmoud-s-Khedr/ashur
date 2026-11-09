@@ -24,6 +24,10 @@ const schema: Record<string, z.ZodTypeAny> = {
     body: z.string().trim().min(1).max(4000),
     answer: z.string().trim().min(1).max(4000),
   }),
+  'prize.save': z.object({
+    body: z.string().trim().min(1).max(4000),
+    answer: z.string().trim().min(1).max(4000),
+  }),
   'stage.jump': z.object({ stage: z.number().int().min(1).max(3) }),
   'round.assignTeams': z.object({ teamIds: z.array(z.number().int()).min(3).max(4) }),
   'answer.submit': z.object({
@@ -104,6 +108,9 @@ const emptyCommands = new Set([
   'audience.show',
   'audience.reveal',
   'audience.finish',
+  'prize.show',
+  'prize.reveal',
+  'prize.finish',
   'question.next',
   'question.start',
   'question.reveal',
@@ -342,6 +349,7 @@ export class Engine {
       settings,
       rounds,
       rulesShownStages: this.state.rulesShownStages,
+      prizeQuestions: this.state.prizeQuestions,
     };
   }
   private buildSet() {
@@ -610,6 +618,10 @@ export class Engine {
       }
       case 'stage.jump': {
         this.phase('IDLE', 'RESULTS');
+        this.require(
+          !s.prizeQuestions?.some((q) => q.status !== 'done'),
+          'Finish the prize question first',
+        );
         if (s.phase === 'RESULTS')
           this.require(
             this.round.audience?.status === 'done',
@@ -667,11 +679,16 @@ export class Engine {
         this.db.prepare('UPDATE devices SET team_id=NULL,seat_no=NULL').run();
         s.rounds = rounds;
         s.rulesShownStages = [];
+        s.prizeQuestions = [];
         this.reset('1-1');
         break;
       }
       case 'round.select': {
         this.phase('IDLE', 'RESULTS');
+        this.require(
+          !s.prizeQuestions?.some((q) => q.status !== 'done'),
+          'Finish the prize question first',
+        );
         if (s.phase === 'RESULTS')
           this.require(
             this.round.audience?.status === 'done',
@@ -1092,8 +1109,49 @@ export class Engine {
         this.round.audience!.status = 'done';
         break;
       }
+      case 'prize.save': {
+        this.phase('RESULTS');
+        this.require(
+          this.round.audience?.status === 'done',
+          'Complete the audience question first',
+        );
+        const prizes = (s.prizeQuestions ??= []);
+        const current = prizes.at(-1);
+        if (current && current.status !== 'done') {
+          this.require(
+            current.status === 'draft' && current.roundKey === s.roundKey,
+            'Prize question already presented',
+          );
+          current.body = p.body;
+          current.answer = p.answer;
+        } else {
+          this.require(prizes.length < 5, 'All five prize questions are complete');
+          prizes.push({ body: p.body, answer: p.answer, status: 'draft', roundKey: s.roundKey });
+        }
+        break;
+      }
+      case 'prize.show':
+      case 'prize.reveal':
+      case 'prize.finish': {
+        this.phase('RESULTS');
+        const current = s.prizeQuestions?.at(-1);
+        const expected =
+          type === 'prize.show' ? 'draft' : type === 'prize.reveal' ? 'question' : 'answer';
+        this.require(
+          current && current.roundKey === s.roundKey && current.status === expected,
+          'Prize question is not ready for this action',
+        );
+        current.status =
+          type === 'prize.show' ? 'question' : type === 'prize.reveal' ? 'answer' : 'done';
+        if (type === 'prize.show') s.scene = 'auto';
+        break;
+      }
       case 'round.next': {
         this.phase('RESULTS');
+        this.require(
+          !s.prizeQuestions?.some((q) => q.status !== 'done'),
+          'Finish the prize question first',
+        );
         this.require(
           this.round.audience?.status === 'done',
           'Complete the audience question first',
@@ -1541,6 +1599,25 @@ export class Engine {
         !!id &&
         s.answers.some((a) => a.teamId === id && a.questionId === qId && a.verdict !== 'void'),
       question: publicQuestion,
+      prizeQuestion: (() => {
+        const prizes = s.prizeQuestions ?? [];
+        const q = prizes.at(-1);
+        if (admin)
+          return {
+            count: prizes.filter((p) => p.status === 'done').length,
+            current: q && q.status !== 'done' ? q : null,
+          };
+        if (actor.role === 'display' && q && ['question', 'answer'].includes(q.status))
+          return {
+            count: prizes.length - 1,
+            current: {
+              body: q.body,
+              status: q.status,
+              ...(q.status === 'answer' ? { answer: q.answer } : {}),
+            },
+          };
+        return null;
+      })(),
       audienceQuestion:
         this.round.audience &&
         (admin ||

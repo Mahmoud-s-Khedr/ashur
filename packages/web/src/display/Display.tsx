@@ -139,7 +139,28 @@ export function Display({ s, remaining, now }: { s: Snapshot; remaining: number;
             : s.stage === 1 && ['RUNNING', 'REVIEW'].includes(phase) && s.tieIds.length < 2
               ? `race-${s.roundKey}`
               : `${s.roundKey}-${phase}`;
-  if (s.audienceQuestion && ['question', 'answer'].includes(s.audienceQuestion.status))
+  if (s.prizeQuestion?.current && ['question', 'answer'].includes(s.prizeQuestion.current.status))
+    scene = (
+      <section className="d-question">
+        <div className="q-block">
+          <div className="q-meta">
+            <span className="chip">
+              {lang === 'en'
+                ? `Prize question ${s.prizeQuestion.count + 1} of 5`
+                : `سؤال الجائزة ${s.prizeQuestion.count + 1} من ٥`}
+            </span>
+          </div>
+          <h1 className="q-body">{s.prizeQuestion.current.body}</h1>
+          {s.prizeQuestion.current.status === 'answer' && (
+            <div className="model-answer">
+              <small>{t.modelAnswer}</small>
+              <b>{s.prizeQuestion.current.answer}</b>
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  else if (s.audienceQuestion && ['question', 'answer'].includes(s.audienceQuestion.status))
     scene = (
       <section className="d-question">
         <div className="q-block">

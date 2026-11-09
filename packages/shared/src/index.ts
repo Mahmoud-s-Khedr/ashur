@@ -116,4 +116,10 @@ export type Match = {
   settings: import('./constants').Settings;
   rounds: Round[];
   rulesShownStages: number[];
+  prizeQuestions?: {
+    body: string;
+    answer: string;
+    status: 'draft' | 'question' | 'answer' | 'done';
+    roundKey: string;
+  }[];
 };

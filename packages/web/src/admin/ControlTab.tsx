@@ -17,6 +17,28 @@ type Action = {
 
 function primaryAction(s: Snapshot, tieQuestion?: number): Action | undefined {
   if (s.phase === 'RESULTS') {
+    const prize = s.prizeQuestion?.current;
+    if (prize)
+      return {
+        cmd:
+          prize.status === 'draft'
+            ? 'prize.show'
+            : prize.status === 'question'
+              ? 'prize.reveal'
+              : 'prize.finish',
+        label:
+          prize.status === 'draft'
+            ? lang === 'en'
+              ? 'Show prize question'
+              : 'عرض سؤال الجائزة'
+            : prize.status === 'question'
+              ? lang === 'en'
+                ? 'Reveal prize answer'
+                : 'إظهار إجابة الجائزة'
+              : lang === 'en'
+                ? 'Finish prize question'
+                : 'إنهاء سؤال الجائزة',
+      };
     const a = s.audienceQuestion;
     if (!a) return undefined;
     if (a.status === 'draft')
@@ -431,6 +453,17 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
   const [tieQ, setTieQ] = useState('');
   const [audienceBody, setAudienceBody] = useState('');
   const [audienceAnswer, setAudienceAnswer] = useState('');
+  const [prizeBody, setPrizeBody] = useState('');
+  const [prizeAnswer, setPrizeAnswer] = useState('');
+  useEffect(() => {
+    setPrizeBody(s.prizeQuestion?.current?.body ?? '');
+    setPrizeAnswer(s.prizeQuestion?.current?.answer ?? '');
+  }, [
+    s.roundKey,
+    s.prizeQuestion?.count,
+    s.prizeQuestion?.current?.body,
+    s.prizeQuestion?.current?.answer,
+  ]);
   useEffect(() => {
     setAudienceBody(s.audienceQuestion?.body ?? '');
     setAudienceAnswer(s.audienceQuestion?.answer ?? '');
@@ -441,7 +474,11 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
     (audienceBody.trim() !== s.audienceQuestion.body ||
       audienceAnswer.trim() !== s.audienceQuestion.answer);
   const action =
-    nextAction && audienceChanged
+    nextAction &&
+    (audienceChanged ||
+      (s.prizeQuestion?.current?.status === 'draft' &&
+        (prizeBody.trim() !== s.prizeQuestion.current.body ||
+          prizeAnswer.trim() !== s.prizeQuestion.current.answer)))
       ? {
           ...nextAction,
           disabled: true,
@@ -572,6 +609,47 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
               </button>
             </Section>
           )}
+        {s.phase === 'RESULTS' &&
+          s.audienceQuestion?.status === 'done' &&
+          s.prizeQuestion &&
+          s.prizeQuestion.count < 5 &&
+          (!s.prizeQuestion.current || s.prizeQuestion.current.status === 'draft') && (
+            <Section
+              title={
+                lang === 'en'
+                  ? `Prize question ${s.prizeQuestion.count + 1} of 5`
+                  : `سؤال الجائزة ${s.prizeQuestion.count + 1} من ٥`
+              }
+            >
+              <p>
+                {lang === 'en'
+                  ? 'Optional at this match: enter a difficult prize question and answer.'
+                  : 'اختياري بعد هذه المباراة: أدخل سؤال جائزة صعباً وإجابته.'}
+              </p>
+              <label>
+                {lang === 'en' ? 'Question' : 'السؤال'}
+                <textarea
+                  value={prizeBody}
+                  maxLength={4000}
+                  onChange={(e) => setPrizeBody(e.target.value)}
+                />
+              </label>
+              <label>
+                {lang === 'en' ? 'Answer' : 'الإجابة'}
+                <textarea
+                  value={prizeAnswer}
+                  maxLength={4000}
+                  onChange={(e) => setPrizeAnswer(e.target.value)}
+                />
+              </label>
+              <button
+                disabled={!prizeBody.trim() || !prizeAnswer.trim()}
+                onClick={() => send('prize.save', { body: prizeBody, answer: prizeAnswer })}
+              >
+                {lang === 'en' ? 'Save prize question' : 'حفظ سؤال الجائزة'}
+              </button>
+            </Section>
+          )}
         {s.phase === 'RESULTS' && winner && (
           <div className="winner-strip">
             <Crown />
@@ -670,7 +748,8 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
                 key={st}
                 disabled={
                   !['IDLE', 'RESULTS'].includes(s.phase) ||
-                  (s.phase === 'RESULTS' && s.audienceQuestion?.status !== 'done')
+                  (s.phase === 'RESULTS' &&
+                    (s.audienceQuestion?.status !== 'done' || !!s.prizeQuestion?.current))
                 }
                 onClick={() => send('stage.jump', { stage: st })}
               >
@@ -685,7 +764,8 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
                 value={s.roundKey}
                 disabled={
                   !['IDLE', 'RESULTS'].includes(s.phase) ||
-                  (s.phase === 'RESULTS' && s.audienceQuestion?.status !== 'done')
+                  (s.phase === 'RESULTS' &&
+                    (s.audienceQuestion?.status !== 'done' || !!s.prizeQuestion?.current))
                 }
                 onChange={(e) => send('round.select', { key: e.target.value })}
               >

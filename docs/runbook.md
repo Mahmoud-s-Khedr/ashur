@@ -48,6 +48,10 @@ After the results of every competition round, including the final, enter a quest
 
 This is separate from the existing Gambler and Final Climb question review, which displays the teams' competition question after their submissions.
 
+## Five prize questions
+
+After completing the regular audience question at any match result, the operator may enter and save the next difficult prize question and its answer in **سؤال الجائزة**. Use the main button to show it, reveal the answer and finish it. Repeat at the same result or spread the five questions across matches as desired, including the final. The counter tracks the five questions in order; no questions are preloaded. The answer remains private until reveal, and these questions do not affect team scores. Once saved, finish the question before moving to another round or stage. Progress and presentation survive refreshes and restarts; a competition reset clears them.
+
 ## Gambler: حظك نحس
 
 Stage-1 winners populate groups A/B/C from rounds 1–4 / 5–8 / 9–12. Settings can change this mapping. Select the group and follow rules/handshake/start.

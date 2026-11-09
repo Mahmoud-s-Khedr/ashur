@@ -76,6 +76,14 @@ export type Snapshot = {
   ownCard: number | null;
   submitted: boolean;
   question: PublicQuestion | null;
+  prizeQuestion?: {
+    count: number;
+    current: {
+      body: string;
+      answer?: string;
+      status: 'draft' | 'question' | 'answer' | 'done';
+    } | null;
+  } | null;
   audienceQuestion: {
     body: string;
     answer?: string;

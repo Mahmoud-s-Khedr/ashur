@@ -37,6 +37,37 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe('M0 foundation', () => {
+  it('presents five optional prize questions across matches, persists progress and protects answers', () => {
+    const display = { role: 'display' as const, deviceId: 'display' };
+    const scores = db.prepare('SELECT * FROM score_events').all();
+    for (let i = 0; i < 5; i++) {
+      engine.state.phase = 'RESULTS';
+      engine.round.completed = true;
+      finishAudience();
+      engine.dispatch('prize.save', { body: `Prize ${i}`, answer: `Secret ${i}` }, admin);
+      expect(() => engine.dispatch('round.next', {}, admin)).toThrow(
+        'Finish the prize question first',
+      );
+      engine.dispatch('prize.show', {}, admin);
+      engine = new Engine(db, () => clock);
+      expect(engine.snapshot(display).prizeQuestion?.current?.body).toBe(`Prize ${i}`);
+      expect(JSON.stringify(engine.snapshot(display))).not.toContain(`Secret ${i}`);
+      expect(JSON.stringify(engine.snapshot(team(1)))).not.toContain(`Secret ${i}`);
+      engine.dispatch('prize.reveal', {}, admin);
+      expect(engine.snapshot(display).prizeQuestion?.current?.answer).toBe(`Secret ${i}`);
+      engine.dispatch('prize.finish', {}, admin);
+      if (i < 4) engine.dispatch('round.next', {}, admin);
+    }
+    expect(engine.snapshot(admin).prizeQuestion?.count).toBe(5);
+    expect(() => engine.dispatch('prize.save', { body: 'Six', answer: 'Six' }, admin)).toThrow(
+      'All five',
+    );
+    expect(db.prepare('SELECT * FROM score_events').all()).toEqual(scores);
+    engine.dispatch('round.next', {}, admin);
+    expect(engine.snapshot(admin).prizeQuestion?.count).toBe(5);
+    engine.dispatch('competition.reset', {}, admin);
+    expect(engine.snapshot(admin).prizeQuestion?.count).toBe(0);
+  });
   it('persists an independent audience question and guards progression until its answer is revealed', () => {
     engine.state.phase = 'RESULTS';
     engine.round.completed = true;
