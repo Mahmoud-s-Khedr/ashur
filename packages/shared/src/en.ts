@@ -386,6 +386,10 @@ export const en: Record<keyof typeof ar, string> = {
   checkCodes: 'Print and hand out the team code cards',
   checkBackup: 'Try downloading a backup',
   setup: 'Setup & devices',
+  resetCompetition: 'Reset whole competition',
+  confirmResetCompetition:
+    'Reset the entire competition? All rounds, scores, qualifiers and question usage will be cleared.',
+  jumpStage: 'Quick jump to stage',
 };
 
 export const phaseNamesEn: Record<string, string> = {
@@ -434,6 +438,8 @@ export const ackLabelsEn: Record<string, string> = {
   'display.scene': 'Scene changed',
   'automation.set': 'Mode changed',
   'round.select': 'Round selected',
+  'stage.jump': 'Jumped to stage',
+  'competition.reset': 'Competition reset',
   'question.reroll': 'Category re-picked',
 };
 

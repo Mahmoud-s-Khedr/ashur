@@ -72,6 +72,14 @@ export function BracketTab({ s, send }: { s: Snapshot; send: Send }) {
             <button className="primary" disabled={!editable || !dirty.size} onClick={save}>
               {t.saveDraw}
             </button>
+            <button
+              className="danger-outline"
+              onClick={() => {
+                if (confirm(t.confirmResetCompetition)) send('competition.reset');
+              }}
+            >
+              {t.resetCompetition}
+            </button>
           </>
         }
       >

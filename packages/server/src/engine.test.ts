@@ -47,6 +47,47 @@ describe('M0 foundation', () => {
   });
 });
 describe('M1 Blitz', () => {
+  it('rejects stage jumps during an active round without changing its progress', () => {
+    start();
+    engine.dispatch('answer.submit', { roundQuestionId: engine.state.set[0], answer: 0 }, team(1));
+    const before = structuredClone(engine.state);
+    const questions = engine.questions();
+    const scores = db.prepare('SELECT * FROM score_events').all();
+    const answers = db.prepare('SELECT * FROM answers').all();
+
+    for (const stage of [1, 2]) {
+      expect(() => engine.dispatch('stage.jump', { stage }, admin)).toThrow();
+      expect(engine.state).toEqual(before);
+      expect(engine.questions()).toEqual(questions);
+      expect(db.prepare('SELECT * FROM score_events').all()).toEqual(scores);
+      expect(db.prepare('SELECT * FROM answers').all()).toEqual(answers);
+    }
+  });
+  it('rejects jumps to a completed stage without changing results or advancement', () => {
+    start();
+    for (let i = 0; i < 10; i++)
+      for (let id = 1; id <= 4; id++)
+        engine.dispatch(
+          'answer.submit',
+          { roundQuestionId: engine.state.set[i], answer: id === 1 ? 0 : 1 },
+          team(id),
+        );
+    for (const round of engine.state.rounds.filter((r) => r.stage === 1)) round.completed = true;
+    const before = structuredClone(engine.state);
+    const questions = engine.questions();
+    const teams = engine.teams();
+    const scores = db.prepare('SELECT * FROM score_events').all();
+    const answers = db.prepare('SELECT * FROM answers').all();
+
+    expect(() => engine.dispatch('stage.jump', { stage: 1 }, admin)).toThrow(
+      'All rounds in this stage are complete',
+    );
+    expect(engine.state).toEqual(before);
+    expect(engine.questions()).toEqual(questions);
+    expect(engine.teams()).toEqual(teams);
+    expect(db.prepare('SELECT * FROM score_events').all()).toEqual(scores);
+    expect(db.prepare('SELECT * FROM answers').all()).toEqual(answers);
+  });
   it('rejects illegal and unauthorized transitions atomically', () => {
     expect(() => engine.dispatch('round.start', {}, admin)).toThrow();
     expect(() => engine.dispatch('round.showRules', {}, team(1))).toThrow();
@@ -727,6 +768,21 @@ describe('presentation support', () => {
     );
     expect(engine.logo(1)?.logo).toBeNull();
     expect(engine.teams()[0].logoV).toBe(0);
+    engine.dispatch('stage.jump', { stage: 2 }, admin);
+    expect(engine.round.key).toBe('2-1');
+    expect(engine.round.stage).toBe(2);
+    expect(engine.state.phase).toBe('IDLE');
+    expect(engine.round.teamIds).toEqual([1, 2, 3, 4]);
+    engine.dispatch('stage.jump', { stage: 3 }, admin);
+    expect(engine.round.key).toBe('3-1');
+    expect(engine.round.stage).toBe(3);
+    expect(engine.round.teamIds).toEqual([1, 2, 3]);
+    engine.dispatch('competition.reset', {}, admin);
+    expect(engine.round.key).toBe('1-1');
+    expect(engine.state.phase).toBe('IDLE');
+    expect(engine.state.rounds.find((r) => r.key === '2-1')!.teamIds).toEqual([]);
+    expect(engine.questions().every((q) => !q.used)).toBe(true);
+    expect(engine.teams().every((t) => t.status === 'active')).toBe(true);
     expect(() =>
       engine.dispatch(
         'teams.save',

@@ -20,6 +20,7 @@ export type Actor = { role: Role | 'system'; deviceId: string; teamId?: number; 
 const object = z.record(z.unknown());
 const schema: Record<string, z.ZodTypeAny> = {
   'round.select': z.object({ key: z.string() }),
+  'stage.jump': z.object({ stage: z.number().int().min(1).max(3) }),
   'round.assignTeams': z.object({ teamIds: z.array(z.number().int()).min(3).max(4) }),
   'answer.submit': z.object({
     roundQuestionId: z.number().int(),
@@ -107,6 +108,7 @@ const emptyCommands = new Set([
   'undo.last',
   'questions.resetUsed',
   'cards.forceFill',
+  'competition.reset',
 ]);
 export class Engine {
   state: Match;
@@ -590,6 +592,62 @@ export class Engine {
         const ids = s.phase === 'TIE_READY' ? s.tieIds : this.round.teamIds;
         if (ids.every((id) => s.ready.includes(id)))
           this.schedule(s.phase === 'TIE_READY' ? 'tiebreak.launch' : 'round.start');
+        break;
+      }
+      case 'stage.jump': {
+        this.phase('IDLE', 'RESULTS');
+        const target = s.rounds.find((r) => r.stage === p.stage && !r.completed);
+        this.require(target, 'All rounds in this stage are complete');
+        const need = target.stage === 3 ? 3 : 4;
+        if (target.teamIds.length !== need) {
+          const allTeams = this.teams();
+          const taken = new Set(
+            s.rounds
+              .filter((r) => r.stage === target.stage && r !== target)
+              .flatMap((r) => r.teamIds),
+          );
+          const preferred = allTeams.filter(
+            (t) =>
+              !taken.has(t.id) &&
+              (target.stage === 2
+                ? t.status === 'qualified'
+                : target.stage === 3
+                  ? t.status === 'finalist'
+                  : t.status !== 'eliminated'),
+          );
+          const fallback = allTeams.filter(
+            (t) => !taken.has(t.id) && !preferred.some((x) => x.id === t.id),
+          );
+          const pool = [...preferred, ...fallback].map((t) => t.id);
+          for (const id of pool) {
+            if (target.teamIds.length >= need) break;
+            if (!target.teamIds.includes(id)) target.teamIds.push(id);
+          }
+        }
+        this.db.prepare('UPDATE devices SET team_id=NULL,seat_no=NULL').run();
+        this.reset(target.key);
+        break;
+      }
+      case 'competition.reset': {
+        const allIds = this.teams().map((t) => t.id);
+        const rounds = [];
+        for (let i = 1; i <= DEFAULTS.stage1Rounds; i++)
+          rounds.push({
+            key: `1-${i}`,
+            stage: 1,
+            seq: i,
+            teamIds: allIds.slice((i - 1) * 4, i * 4),
+          });
+        for (let i = 1; i <= DEFAULTS.stage2Rounds; i++)
+          rounds.push({ key: `2-${i}`, stage: 2, seq: i, teamIds: [] });
+        rounds.push({ key: '3-1', stage: 3, seq: 1, teamIds: [] });
+        this.db.prepare("UPDATE teams SET status='active'").run();
+        this.db.prepare('UPDATE questions SET is_used=0').run();
+        this.db.prepare('DELETE FROM score_events').run();
+        this.db.prepare('DELETE FROM answers').run();
+        this.db.prepare('UPDATE devices SET team_id=NULL,seat_no=NULL').run();
+        s.rounds = rounds;
+        this.reset('1-1');
         break;
       }
       case 'round.select': {
