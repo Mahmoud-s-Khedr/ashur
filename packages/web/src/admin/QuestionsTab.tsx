@@ -90,9 +90,19 @@ function Editor({
             {t.stage}
             <select
               value={d.stage ?? ''}
-              onChange={(e) =>
-                setD({ ...d, stage: e.target.value ? Number(e.target.value) : null })
-              }
+              onChange={(e) => {
+                const nextStage = e.target.value ? Number(e.target.value) : null;
+                setD({
+                  ...d,
+                  stage: nextStage,
+                  type:
+                    nextStage === 1
+                      ? 'mcq'
+                      : (nextStage === 2 || nextStage === 3) && d.type === 'mcq'
+                        ? 'text'
+                        : d.type,
+                });
+              }}
             >
               <option value="">{t.reserve}</option>
               {[1, 2, 3].map((n) => (
@@ -104,7 +114,16 @@ function Editor({
           </label>
           <label>
             {t.pool}
-            <select value={d.pool} onChange={(e) => setD({ ...d, pool: e.target.value })}>
+            <select
+              value={d.pool}
+              onChange={(e) =>
+                setD({
+                  ...d,
+                  pool: e.target.value,
+                  type: e.target.value === 'tiebreaker' && d.type === 'mcq' ? 'text' : d.type,
+                })
+              }
+            >
               {['main', 'reserve', 'tiebreaker'].map((v) => (
                 <option key={v} value={v}>
                   {t[v as keyof typeof t]}
@@ -129,7 +148,14 @@ function Editor({
             {t.type}
             <select value={d.type} onChange={(e) => setD({ ...d, type: e.target.value })}>
               {['mcq', 'text', 'numeric'].map((v) => (
-                <option key={v} value={v}>
+                <option
+                  key={v}
+                  value={v}
+                  disabled={
+                    (d.stage === 1 && v !== 'mcq') ||
+                    ((d.stage === 2 || d.stage === 3) && v === 'mcq')
+                  }
+                >
                   {t[v as keyof typeof t]}
                 </option>
               ))}

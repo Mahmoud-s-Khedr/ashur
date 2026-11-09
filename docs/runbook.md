@@ -44,13 +44,13 @@ The header shows the authoritative phase and automation mode. The main green but
 
 ## Separate audience question after each round
 
-After the results of every competition round, including the final, enter a question and answer in **سؤال الجمهور** and save it. The hero button then shows the question on the projector, reveals its answer, and finishes the audience step in that order. The operator supplies the content; none is preloaded. The question belongs to that round and is stored independently of the competition bank and team scores. It can be edited before it is shown. Refreshing or restarting restores its current presentation state; automatic mode waits for the operator. Finish the audience step before selecting another round or stage. After the final, finishing returns the projector to the champion celebration.
+After the results of every competition round, including the final, the server automatically selects a random unused question and its model answer from the question bank for **سؤال الجمهور**. You can optionally click **اختيار سؤال عشوائي آخر** before showing it to pick another unused question. The hero button shows the question on the projector, reveals its answer, and finishes the audience step in that order. Any question chosen once is marked used and never chosen again. Refreshing or restarting restores its current presentation state; automatic mode waits for the operator. Finish the audience step before selecting another round or stage. After the final, finishing returns the projector to the champion celebration.
 
 This is separate from the existing Gambler and Final Climb question review, which displays the teams' competition question after their submissions.
 
 ## Five prize questions
 
-After completing the regular audience question at any match result, the operator may enter and save the next difficult prize question and its answer in **سؤال الجائزة**. Use the main button to show it, reveal the answer and finish it. Repeat at the same result or spread the five questions across matches as desired, including the final. The counter tracks the five questions in order; no questions are preloaded. The answer remains private until reveal, and these questions do not affect team scores. Once saved, finish the question before moving to another round or stage. Progress and presentation survive refreshes and restarts; a competition reset clears them.
+After the second stage (Gambler / حظك نحس) is completely finished (after Round 2-3's audience question is done) and before the final stage (Final Climb / سلم عاشور), five prize questions are automatically chosen at random from the unused questions in the question bank in **سؤال الجائزة**. Use the main button to show each question on the projector, reveal its answer, and finish it across all five questions before advancing to the final stage. Questions chosen once are never chosen again, the answer remains private until reveal, and these questions do not affect team scores. Progress and presentation survive refreshes and restarts; a competition reset clears them.
 
 ## Gambler: حظك نحس
 

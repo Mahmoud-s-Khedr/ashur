@@ -291,14 +291,13 @@ export async function browserOperations(s: Server) {
         })),
     });
     async function startStage(key: string, teamIds: number[]) {
-      await p.getByLabel('Question', { exact: true }).fill('Audience browser question');
-      await p.getByLabel('Answer', { exact: true }).fill('Audience browser answer');
-      await p.getByRole('button', { name: 'Save audience question' }).click();
+      const qBody = observer.s.audienceQuestion.body;
+      const qAnswer = observer.s.audienceQuestion.answer;
       await p.getByRole('button', { name: /Show audience question/ }).click();
-      await expect(display.page.getByText('Audience browser question')).toBeVisible();
-      await expect(display.page.getByText('Audience browser answer')).toHaveCount(0);
+      await expect(display.page.getByText(qBody)).toBeVisible();
+      await expect(display.page.locator('.model-answer')).toHaveCount(0);
       await p.getByRole('button', { name: /Reveal audience answer/ }).click();
-      await expect(display.page.getByText('Audience browser answer')).toBeVisible();
+      await expect(display.page.locator('.model-answer')).toContainText(qAnswer);
       await p.getByRole('button', { name: /Finish audience question/ }).click();
       await observer.cmd('round.select', { key });
       await observer.cmd('round.assignTeams', { teamIds });
@@ -332,7 +331,8 @@ export async function browserOperations(s: Server) {
         await teams[i].page.bringToFront();
         await expect(teams[i].page.locator('.text-answer textarea')).toBeVisible();
         await teams[i].page.locator('.text-answer textarea').fill(i === 0 ? '4' : 'wrong');
-        await teams[i].page.getByRole('button', { name: /^Submit answer/ }).click();
+        if (i === 0) await teams[i].page.locator('.text-answer textarea').press('Enter');
+        else await teams[i].page.getByRole('button', { name: /^Submit answer/ }).click();
       }
       await expect(p.locator('.grade-row')).toHaveCount(count);
       await expect(p.locator('.hero-btn')).toBeDisabled();

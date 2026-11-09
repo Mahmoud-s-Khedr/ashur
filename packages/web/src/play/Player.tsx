@@ -119,6 +119,18 @@ function Welcome({ s }: { s: Snapshot }) {
 }
 
 function ReadyButton({ ready, send }: { ready: boolean; send: Send }) {
+  useEffect(() => {
+    if (ready) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.code === 'Enter' || e.code === 'NumpadEnter') {
+        e.preventDefault();
+        navigator.vibrate?.([30, 40, 30]);
+        send('team.ready');
+      }
+    };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, [ready, send]);
   return (
     <button
       className={`ready-orb ${ready ? 'is-ready' : ''}`}
@@ -193,6 +205,7 @@ export function Question({
   const q = s.question!;
   const [text, setText] = useState('');
   const [sent, setSent] = useState<number | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
     setText('');
     setSent(null);
@@ -217,38 +230,57 @@ export function Question({
     setSent(i);
     send('answer.submit', { roundQuestionId: q.id, answer: i });
   };
+  const submitText = (raw = text) => {
+    const cleaned = raw.replace(/[\r\n]+/g, ' ').trim();
+    if (!cleaned || locked) return;
+    navigator.vibrate?.(25);
+    setSent(0);
+    send('answer.submit', { roundQuestionId: q.id, answer: cleaned });
+  };
   useEffect(() => {
-    if (q.type !== 'mcq' || locked) return;
+    if (q.type === 'mcq' || locked || s.paused) return;
+    textareaRef.current?.focus();
+  }, [q.id, q.type, s.phase, s.paused, locked]);
+  useEffect(() => {
+    if (locked) return;
     const onKey = (e: KeyboardEvent) => {
-      const map: Record<string, number> = {
-        '1': 0,
-        '2': 1,
-        '3': 2,
-        '4': 3,
-        a: 0,
-        b: 1,
-        c: 2,
-        d: 3,
-      };
-      const i = map[e.key.toLowerCase()];
-      if (i !== undefined && i < q.options.length) answer(i);
+      if (q.type === 'mcq') {
+        const map: Record<string, number> = {
+          '1': 0,
+          '2': 1,
+          '3': 2,
+          '4': 3,
+          a: 0,
+          b: 1,
+          c: 2,
+          d: 3,
+        };
+        const i = map[e.key.toLowerCase()];
+        if (i !== undefined && i < q.options.length) answer(i);
+        return;
+      }
+      if (e.defaultPrevented || e.shiftKey) return;
+      if (e.key === 'Enter' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.keyCode === 13) {
+        e.preventDefault();
+        submitText(textareaRef.current?.value ?? text);
+      }
     };
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
-  }, [q.id, locked]);
+  }, [q.id, q.type, locked, text]);
   const count = s.stage === 1 ? c.blitzCount : s.stage === 2 ? c.gamblerCount : c.climbCount;
   const idx = s.stage === 1 ? s.ownProgress : s.index;
   return (
-    <section className={`p-question ${q.difficulty === 'joker' ? 'joker' : ''}`} key={q.id}>
+    <section className={`p-question ${q.difficulty === 'joker' && !tie ? 'joker' : ''}`} key={q.id}>
       <TimerBar remaining={remaining} total={total} paused={s.paused} />
       <div className="q-top">
         <span className="chip">{q.category}</span>
-        {s.stage !== 2 && diffLabel && (
+        {s.stage !== 2 && !tie && diffLabel && (
           <span className={`chip diff ${q.difficulty}`}>
             {q.difficulty === 'joker' && <Joker />} {diffLabel}
           </span>
         )}
-        {s.stage === 2 && s.ownCard !== null && (
+        {s.stage === 2 && !tie && s.ownCard !== null && (
           <span className="chip diff gold">
             {t.card} <b className="num">{s.ownCard}</b>
           </span>
@@ -277,18 +309,39 @@ export function Question({
           className="text-answer"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!text.trim()) return;
-            setSent(0);
-            send('answer.submit', { roundQuestionId: q.id, answer: text });
+            submitText(textareaRef.current?.value ?? text);
           }}
         >
           <textarea
+            ref={textareaRef}
             required
             autoFocus
+            enterKeyHint="send"
             aria-label={t.answer}
             inputMode={q.type === 'numeric' ? 'decimal' : 'text'}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val.includes('\n') || val.includes('\r')) {
+                const cleaned = val.replace(/[\r\n]+/g, ' ');
+                setText(cleaned);
+                submitText(cleaned);
+                return;
+              }
+              setText(val);
+            }}
+            onKeyDown={(e) => {
+              if (
+                (e.key === 'Enter' ||
+                  e.code === 'Enter' ||
+                  e.code === 'NumpadEnter' ||
+                  e.keyCode === 13) &&
+                !e.shiftKey
+              ) {
+                e.preventDefault();
+                submitText(e.currentTarget.value || text);
+              }
+            }}
             maxLength={2000}
             placeholder={t.typeAnswer}
           />

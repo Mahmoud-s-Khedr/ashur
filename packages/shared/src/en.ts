@@ -390,6 +390,8 @@ export const en: Record<keyof typeof ar, string> = {
   confirmResetCompetition:
     'Reset the entire competition? All rounds, scores, qualifiers and question usage will be cleared.',
   jumpStage: 'Quick jump to stage',
+  lightTheme: 'Light theme',
+  darkTheme: 'Dark theme',
 };
 
 export const phaseNamesEn: Record<string, string> = {

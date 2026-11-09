@@ -36,8 +36,37 @@ export function Display({ s, remaining, now }: { s: Snapshot; remaining: number;
   sfx.muted = !s.settings.sound;
   const { toasts, push } = useToasts(3000, 2);
   const [soundOn, setSoundOn] = useState(false);
+  const [light, setLight] = useState(() => {
+    try {
+      const q = new URLSearchParams(location.search).get('theme');
+      if (q === 'light' || q === 'dark') {
+        localStorage.setItem('ashour-display-theme', q);
+        return q === 'light';
+      }
+      return localStorage.getItem('ashour-display-theme') === 'light';
+    } catch {
+      return false;
+    }
+  });
   const [idle, setIdle] = useState(false);
   const idleTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('display-light', light);
+    return () => document.documentElement.classList.remove('display-light');
+  }, [light]);
+
+  const toggleTheme = () => {
+    setLight((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('ashour-display-theme', next ? 'light' : 'dark');
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     const wake = () => {
@@ -244,7 +273,12 @@ export function Display({ s, remaining, now }: { s: Snapshot; remaining: number;
   }
   const qualified = s.rounds.filter((r) => r.stage === 1 && r.completed).length;
   return (
-    <main className={`display-root ${idle ? 'idle' : ''}`} data-stage={s.stage} dir={dir}>
+    <main
+      className={`display-root ${idle ? 'idle' : ''} ${light ? 'light' : ''}`}
+      data-theme={light ? 'light' : 'dark'}
+      data-stage={s.stage}
+      dir={dir}
+    >
       <div className="aurora" aria-hidden="true">
         <i />
         <i />
@@ -267,6 +301,9 @@ export function Display({ s, remaining, now }: { s: Snapshot; remaining: number;
           </span>
         </div>
         <div className="d-tools">
+          <button className={light ? 'selected' : ''} onClick={toggleTheme}>
+            {light ? t.darkTheme : t.lightTheme}
+          </button>
           <button onClick={() => void document.documentElement.requestFullscreen?.()}>
             {t.fullScreen}
           </button>

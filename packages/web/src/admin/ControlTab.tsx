@@ -17,31 +17,8 @@ type Action = {
 
 function primaryAction(s: Snapshot, tieQuestion?: number): Action | undefined {
   if (s.phase === 'RESULTS') {
-    const prize = s.prizeQuestion?.current;
-    if (prize)
-      return {
-        cmd:
-          prize.status === 'draft'
-            ? 'prize.show'
-            : prize.status === 'question'
-              ? 'prize.reveal'
-              : 'prize.finish',
-        label:
-          prize.status === 'draft'
-            ? lang === 'en'
-              ? 'Show prize question'
-              : 'عرض سؤال الجائزة'
-            : prize.status === 'question'
-              ? lang === 'en'
-                ? 'Reveal prize answer'
-                : 'إظهار إجابة الجائزة'
-              : lang === 'en'
-                ? 'Finish prize question'
-                : 'إنهاء سؤال الجائزة',
-      };
     const a = s.audienceQuestion;
-    if (!a) return undefined;
-    if (a.status === 'draft')
+    if (!a || a.status === 'draft')
       return {
         cmd: 'audience.show',
         label: lang === 'en' ? 'Show audience question' : 'عرض سؤال الجمهور',
@@ -55,6 +32,28 @@ function primaryAction(s: Snapshot, tieQuestion?: number): Action | undefined {
       return {
         cmd: 'audience.finish',
         label: lang === 'en' ? 'Finish audience question' : 'إنهاء سؤال الجمهور',
+      };
+    const prize = s.prizeQuestion?.current;
+    if (prize || (s.prizeQuestion?.eligible && s.prizeQuestion.count < 5))
+      return {
+        cmd:
+          !prize || prize.status === 'draft'
+            ? 'prize.show'
+            : prize.status === 'question'
+              ? 'prize.reveal'
+              : 'prize.finish',
+        label:
+          !prize || prize.status === 'draft'
+            ? lang === 'en'
+              ? 'Show prize question'
+              : 'عرض سؤال الجائزة'
+            : prize.status === 'question'
+              ? lang === 'en'
+                ? 'Reveal prize answer'
+                : 'إظهار إجابة الجائزة'
+              : lang === 'en'
+                ? 'Finish prize question'
+                : 'إنهاء سؤال الجائزة',
       };
     if (s.stage === 3) return undefined;
   }
@@ -451,40 +450,7 @@ function Emergency({ s, send }: { s: Snapshot; send: Send }) {
 
 export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; remaining: number }) {
   const [tieQ, setTieQ] = useState('');
-  const [audienceBody, setAudienceBody] = useState('');
-  const [audienceAnswer, setAudienceAnswer] = useState('');
-  const [prizeBody, setPrizeBody] = useState('');
-  const [prizeAnswer, setPrizeAnswer] = useState('');
-  useEffect(() => {
-    setPrizeBody(s.prizeQuestion?.current?.body ?? '');
-    setPrizeAnswer(s.prizeQuestion?.current?.answer ?? '');
-  }, [
-    s.roundKey,
-    s.prizeQuestion?.count,
-    s.prizeQuestion?.current?.body,
-    s.prizeQuestion?.current?.answer,
-  ]);
-  useEffect(() => {
-    setAudienceBody(s.audienceQuestion?.body ?? '');
-    setAudienceAnswer(s.audienceQuestion?.answer ?? '');
-  }, [s.roundKey, s.audienceQuestion?.body, s.audienceQuestion?.answer]);
-  const nextAction = primaryAction(s, tieQ ? Number(tieQ) : undefined);
-  const audienceChanged =
-    s.audienceQuestion?.status === 'draft' &&
-    (audienceBody.trim() !== s.audienceQuestion.body ||
-      audienceAnswer.trim() !== s.audienceQuestion.answer);
-  const action =
-    nextAction &&
-    (audienceChanged ||
-      (s.prizeQuestion?.current?.status === 'draft' &&
-        (prizeBody.trim() !== s.prizeQuestion.current.body ||
-          prizeAnswer.trim() !== s.prizeQuestion.current.answer)))
-      ? {
-          ...nextAction,
-          disabled: true,
-          hint: lang === 'en' ? 'Save your changes first' : 'احفظ التغييرات أولاً',
-        }
-      : nextAction;
+  const action = primaryAction(s, tieQ ? Number(tieQ) : undefined);
   const tieOptions = (s.questions ?? []).filter((q: Question) => q.pool !== 'main' && !q.used);
   const pending = (s.answers ?? []).filter((a: any) => a.verdict === 'pending');
   const total =
@@ -575,45 +541,33 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
             )}
           </div>
         </section>
-        {s.phase === 'RESULTS' &&
-          (!s.audienceQuestion || s.audienceQuestion.status === 'draft') && (
-            <Section title={lang === 'en' ? 'Audience question' : 'سؤال الجمهور'}>
-              <p>
+        {s.phase === 'RESULTS' && (!s.audienceQuestion || s.audienceQuestion.status !== 'done') && (
+          <Section title={lang === 'en' ? 'Audience question' : 'سؤال الجمهور'}>
+            {s.audienceQuestion ? (
+              <>
+                <h3 className="preview-body">{s.audienceQuestion.body}</h3>
+                <p className="model-text">
+                  {t.model}: <b>{s.audienceQuestion.answer}</b>
+                </p>
+              </>
+            ) : (
+              <p className="muted">
                 {lang === 'en'
-                  ? 'Enter a separate question and answer for the audience.'
-                  : 'أدخل سؤالاً وإجابة منفصلين للجمهور.'}
+                  ? 'A random unused question from the bank will be shown to the audience.'
+                  : 'سيتم اختيار سؤال عشوائي غير مستخدم من بنك الأسئلة للجمهور.'}
               </p>
-              <label>
-                {lang === 'en' ? 'Question' : 'السؤال'}
-                <textarea
-                  value={audienceBody}
-                  maxLength={4000}
-                  onChange={(e) => setAudienceBody(e.target.value)}
-                />
-              </label>
-              <label>
-                {lang === 'en' ? 'Answer' : 'الإجابة'}
-                <textarea
-                  value={audienceAnswer}
-                  maxLength={4000}
-                  onChange={(e) => setAudienceAnswer(e.target.value)}
-                />
-              </label>
-              <button
-                disabled={!audienceBody.trim() || !audienceAnswer.trim()}
-                onClick={() =>
-                  send('audience.save', { body: audienceBody, answer: audienceAnswer })
-                }
-              >
-                {lang === 'en' ? 'Save audience question' : 'حفظ سؤال الجمهور'}
+            )}
+            {(!s.audienceQuestion || s.audienceQuestion.status === 'draft') && (
+              <button onClick={() => send('audience.save', {})}>
+                {lang === 'en' ? 'Pick another random question' : 'اختيار سؤال عشوائي آخر'}
               </button>
-            </Section>
-          )}
+            )}
+          </Section>
+        )}
         {s.phase === 'RESULTS' &&
           s.audienceQuestion?.status === 'done' &&
           s.prizeQuestion &&
-          s.prizeQuestion.count < 5 &&
-          (!s.prizeQuestion.current || s.prizeQuestion.current.status === 'draft') && (
+          (s.prizeQuestion.current || (s.prizeQuestion.eligible && s.prizeQuestion.count < 5)) && (
             <Section
               title={
                 lang === 'en'
@@ -621,33 +575,25 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
                   : `سؤال الجائزة ${s.prizeQuestion.count + 1} من ٥`
               }
             >
-              <p>
-                {lang === 'en'
-                  ? 'Optional at this match: enter a difficult prize question and answer.'
-                  : 'اختياري بعد هذه المباراة: أدخل سؤال جائزة صعباً وإجابته.'}
-              </p>
-              <label>
-                {lang === 'en' ? 'Question' : 'السؤال'}
-                <textarea
-                  value={prizeBody}
-                  maxLength={4000}
-                  onChange={(e) => setPrizeBody(e.target.value)}
-                />
-              </label>
-              <label>
-                {lang === 'en' ? 'Answer' : 'الإجابة'}
-                <textarea
-                  value={prizeAnswer}
-                  maxLength={4000}
-                  onChange={(e) => setPrizeAnswer(e.target.value)}
-                />
-              </label>
-              <button
-                disabled={!prizeBody.trim() || !prizeAnswer.trim()}
-                onClick={() => send('prize.save', { body: prizeBody, answer: prizeAnswer })}
-              >
-                {lang === 'en' ? 'Save prize question' : 'حفظ سؤال الجائزة'}
-              </button>
+              {s.prizeQuestion.current ? (
+                <>
+                  <h3 className="preview-body">{s.prizeQuestion.current.body}</h3>
+                  <p className="model-text">
+                    {t.model}: <b>{s.prizeQuestion.current.answer}</b>
+                  </p>
+                </>
+              ) : (
+                <p className="muted">
+                  {lang === 'en'
+                    ? 'A random unused prize question from the bank will be shown.'
+                    : 'سيتم اختيار سؤال جائزة عشوائي غير مستخدم من بنك الأسئلة.'}
+                </p>
+              )}
+              {(!s.prizeQuestion.current || s.prizeQuestion.current.status === 'draft') && (
+                <button onClick={() => send('prize.save', {})}>
+                  {lang === 'en' ? 'Pick another random question' : 'اختيار سؤال عشوائي آخر'}
+                </button>
+              )}
             </Section>
           )}
         {s.phase === 'RESULTS' && winner && (
@@ -749,7 +695,9 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
                 disabled={
                   !['IDLE', 'RESULTS'].includes(s.phase) ||
                   (s.phase === 'RESULTS' &&
-                    (s.audienceQuestion?.status !== 'done' || !!s.prizeQuestion?.current))
+                    (s.audienceQuestion?.status !== 'done' ||
+                      !!s.prizeQuestion?.current ||
+                      (!!s.prizeQuestion?.eligible && s.prizeQuestion.count < 5)))
                 }
                 onClick={() => send('stage.jump', { stage: st })}
               >
@@ -765,7 +713,9 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
                 disabled={
                   !['IDLE', 'RESULTS'].includes(s.phase) ||
                   (s.phase === 'RESULTS' &&
-                    (s.audienceQuestion?.status !== 'done' || !!s.prizeQuestion?.current))
+                    (s.audienceQuestion?.status !== 'done' ||
+                      !!s.prizeQuestion?.current ||
+                      (!!s.prizeQuestion?.eligible && s.prizeQuestion.count < 5)))
                 }
                 onChange={(e) => send('round.select', { key: e.target.value })}
               >

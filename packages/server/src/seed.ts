@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { openDb } from './db';
 import { DEFAULTS, questionSchema } from '@ashour/shared';
 import questions from '../content/questions.json';
-import { seed as seedDemo } from './demo-seed';
+import { seed as seedDemo, normalizeWrittenQuestions } from './demo-seed';
 
 export function seed(db: ReturnType<typeof openDb>) {
   if (process.env.QUESTION_BANK === 'demo') return seedDemo(db);
@@ -17,7 +17,10 @@ export function seed(db: ReturnType<typeof openDb>) {
           colors[(i - 1) % colors.length],
         );
     }
-    if ((db.prepare('SELECT COUNT(*) AS n FROM questions').get() as { n: number }).n) return;
+    if ((db.prepare('SELECT COUNT(*) AS n FROM questions').get() as { n: number }).n) {
+      normalizeWrittenQuestions(db);
+      return;
+    }
     const insert = db.prepare('INSERT INTO questions(id,json) VALUES(?,?)');
     for (const question of questions) {
       const q = questionSchema.parse(question);

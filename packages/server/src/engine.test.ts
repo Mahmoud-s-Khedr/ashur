@@ -7,10 +7,16 @@ let clock = 0;
 const admin = { role: 'admin' as const, deviceId: 'admin' };
 const team = (teamId: number) => ({ role: 'team' as const, deviceId: `team-${teamId}`, teamId });
 function finishAudience() {
-  engine.dispatch('audience.save', { body: 'Audience question', answer: 'Audience answer' }, admin);
   engine.dispatch('audience.show', {}, admin);
   engine.dispatch('audience.reveal', {}, admin);
   engine.dispatch('audience.finish', {}, admin);
+}
+function finishPrizes() {
+  for (let i = 0; i < 5; i++) {
+    engine.dispatch('prize.show', {}, admin);
+    engine.dispatch('prize.reveal', {}, admin);
+    engine.dispatch('prize.finish', {}, admin);
+  }
 }
 function start(key = '1-1') {
   engine.dispatch('settings.update', { settings: { automation: 'manual', countdownMs: 1 } }, admin);
@@ -37,38 +43,58 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe('M0 foundation', () => {
-  it('presents five optional prize questions across matches, persists progress and protects answers', () => {
+  it('presents five random prize questions only after Stage 2 is complete and before Stage 3, without repeats', () => {
     const display = { role: 'display' as const, deviceId: 'display' };
     const scores = db.prepare('SELECT * FROM score_events').all();
+    engine.state.phase = 'RESULTS';
+    engine.round.completed = true;
+    finishAudience();
+    expect(() => engine.dispatch('prize.show', {}, admin)).toThrow('after Stage 2 is complete');
+    expect(() => engine.dispatch('prize.save', {}, admin)).toThrow('after Stage 2 is complete');
+
+    engine.dispatch('round.select', { key: '2-3' }, admin);
+    for (const r of engine.state.rounds.filter((r) => r.stage === 2 && r.key !== '2-3'))
+      r.completed = true;
+    engine.state.phase = 'RESULTS';
+    engine.round.completed = false;
+    finishAudience();
+    expect(() => engine.dispatch('prize.show', {}, admin)).toThrow('after Stage 2 is complete');
+
+    engine.round.completed = true;
+    engine.round.audience = undefined;
+    finishAudience();
+    const chosenBodies = new Set<string>([engine.round.audience!.body]);
     for (let i = 0; i < 5; i++) {
-      engine.state.phase = 'RESULTS';
-      engine.round.completed = true;
-      finishAudience();
-      engine.dispatch('prize.save', { body: `Prize ${i}`, answer: `Secret ${i}` }, admin);
       expect(() => engine.dispatch('round.next', {}, admin)).toThrow(
         'Finish the prize question first',
       );
+      const draft = engine.snapshot(admin).prizeQuestion?.current;
+      expect(draft?.status).toBe('draft');
+      expect(draft?.body).toBeTruthy();
+      expect(chosenBodies.has(draft!.body)).toBe(false);
+      chosenBodies.add(draft!.body);
+      const secretAnswer = draft!.answer!;
       engine.dispatch('prize.show', {}, admin);
       engine = new Engine(db, () => clock);
-      expect(engine.snapshot(display).prizeQuestion?.current?.body).toBe(`Prize ${i}`);
-      expect(JSON.stringify(engine.snapshot(display))).not.toContain(`Secret ${i}`);
-      expect(JSON.stringify(engine.snapshot(team(1)))).not.toContain(`Secret ${i}`);
+      expect(engine.snapshot(display).prizeQuestion?.current?.body).toBe(draft!.body);
+      expect(engine.snapshot(display).prizeQuestion?.current).not.toHaveProperty('answer');
+      expect(engine.snapshot(team(1)).prizeQuestion).toBeNull();
       engine.dispatch('prize.reveal', {}, admin);
-      expect(engine.snapshot(display).prizeQuestion?.current?.answer).toBe(`Secret ${i}`);
+      expect(engine.snapshot(display).prizeQuestion?.current?.answer).toBe(secretAnswer);
       engine.dispatch('prize.finish', {}, admin);
-      if (i < 4) engine.dispatch('round.next', {}, admin);
     }
+    expect(chosenBodies.size).toBe(6);
     expect(engine.snapshot(admin).prizeQuestion?.count).toBe(5);
-    expect(() => engine.dispatch('prize.save', { body: 'Six', answer: 'Six' }, admin)).toThrow(
-      'All five',
-    );
+    expect(() => engine.dispatch('prize.save', {}, admin)).toThrow('All five');
+    expect(() => engine.dispatch('prize.show', {}, admin)).toThrow('All five');
     expect(db.prepare('SELECT * FROM score_events').all()).toEqual(scores);
     engine.dispatch('round.next', {}, admin);
+    expect(engine.state.roundKey).toBe('3-1');
     expect(engine.snapshot(admin).prizeQuestion?.count).toBe(5);
     engine.dispatch('competition.reset', {}, admin);
     expect(engine.snapshot(admin).prizeQuestion?.count).toBe(0);
   });
-  it('persists an independent audience question and guards progression until its answer is revealed', () => {
+  it('persists an independent random audience question from the bank and guards progression until its answer is revealed', () => {
     engine.state.phase = 'RESULTS';
     engine.round.completed = true;
     engine.dispatch('automation.set', { mode: 'auto' }, admin);
@@ -83,21 +109,27 @@ describe('M0 foundation', () => {
         'Complete the audience question first',
       );
     }
-    engine.dispatch('audience.save', { body: 'Separate question', answer: 'Secret answer' }, admin);
-    expect(JSON.stringify(engine.snapshot({ role: 'display', deviceId: 'display' }))).not.toContain(
-      'Secret answer',
-    );
+    engine.dispatch('audience.save', {}, admin);
+    const firstPick = engine.round.audience!;
+    expect(firstPick.status).toBe('draft');
+    expect(firstPick.questionId).toBeGreaterThan(0);
+    engine.dispatch('audience.save', {}, admin);
+    const secondPick = engine.round.audience!;
+    expect(secondPick.questionId).not.toBe(firstPick.questionId);
+    expect(secondPick.body).not.toBe(firstPick.body);
+    expect(engine.snapshot({ role: 'display', deviceId: 'display' }).audienceQuestion).toBeNull();
     engine.dispatch('audience.show', {}, admin);
     engine = new Engine(db, () => clock);
     const display = { role: 'display' as const, deviceId: 'display' };
     expect(engine.snapshot(display).audienceQuestion).toEqual({
-      body: 'Separate question',
+      body: secondPick.body,
       status: 'question',
     });
-    expect(JSON.stringify(engine.snapshot(team(1)))).not.toContain('Secret answer');
+    expect(engine.snapshot(display).audienceQuestion).not.toHaveProperty('answer');
+    expect(engine.snapshot(team(1)).audienceQuestion).toBeNull();
     expect(() => engine.dispatch('audience.finish', {}, admin)).toThrow();
     engine.dispatch('audience.reveal', {}, admin);
-    expect(engine.snapshot(display).audienceQuestion?.answer).toBe('Secret answer');
+    expect(engine.snapshot(display).audienceQuestion?.answer).toBe(secondPick.answer);
     engine.dispatch('audience.finish', {}, admin);
     expect(db.prepare('SELECT * FROM score_events').all()).toEqual(scores);
     engine.dispatch('round.next', {}, admin);
@@ -635,6 +667,7 @@ describe('full 48-team tournament', () => {
         if (i < 7) engine.dispatch('question.next', {}, admin);
       }
       finishAudience();
+      if (r === 2) finishPrizes();
       engine.dispatch('round.next', {}, admin);
     }
     expect(engine.round.teamIds).toHaveLength(3);

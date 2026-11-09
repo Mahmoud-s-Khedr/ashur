@@ -2169,6 +2169,12 @@ html.display-page body {
 }
 
 /* ---- direction-aware glyphs and anchors (English mode is LTR) ---- */
+.funnel-arrow,
+.b-link::after {
+  display: inline-block;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
 .funnel-arrow::before {
   content: '‹';
 }
@@ -2194,4 +2200,138 @@ html.display-page body {
 .display-root .chip,
 .display-root .badge {
   gap: 0.35em;
+}
+
+/* ===== Light theme for /display ===== */
+html.display-page.display-light,
+.display-root.light {
+  color-scheme: light;
+  --bg0: #f4f7fe;
+  --bg1: #eaf0fb;
+  --bg2: #dde6f7;
+  --panel: rgba(255, 255, 255, 0.88);
+  --panel-solid: #ffffff;
+  --panel-hi: #edf2fc;
+  --border: rgba(15, 23, 49, 0.12);
+  --border-hi: rgba(15, 23, 49, 0.24);
+  --text: #0f1731;
+  --muted: #4b587c;
+  --teal: #0d9f80;
+  --gold: #c98200;
+  --violet: #585ae6;
+  --pink: #d93870;
+  --red: #d93044;
+  --green: #169c53;
+  --blue: #1b78d6;
+}
+html.display-page.display-light body,
+.display-root.light {
+  background:
+    radial-gradient(1200px 700px at 85% -10%, rgba(88, 90, 230, 0.12), transparent 60%),
+    radial-gradient(900px 600px at 0% 110%, rgba(13, 159, 128, 0.1), transparent 60%), var(--bg0);
+  color: var(--text);
+}
+.display-root.light .aurora i {
+  opacity: 0.15;
+}
+.display-root.light .stage-title {
+  background: linear-gradient(120deg, var(--text) 30%, var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.display-root.light .intro-title {
+  background: linear-gradient(
+    110deg,
+    var(--gold) 15%,
+    var(--text) 45%,
+    var(--teal) 70%,
+    var(--violet)
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.display-root.light .winner-name,
+.display-root.light .champ-name {
+  background: linear-gradient(120deg, var(--text) 20%, var(--gold));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.display-root.light .crumb,
+.display-root.light .chip {
+  background: rgba(15, 23, 49, 0.06);
+}
+.display-root.light .crumb.stage {
+  background: var(--accent);
+  color: #ffffff;
+}
+.display-root.light .d-tools button {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: var(--border-hi);
+  color: var(--text);
+}
+.display-root.light .d-tools button.selected {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: transparent;
+}
+.display-root.light .b-round,
+.display-root.light .b-col {
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 4px 18px rgba(15, 23, 49, 0.06);
+}
+.display-root.light .b-team {
+  background: rgba(15, 23, 49, 0.04);
+}
+.display-root.light .d-paused {
+  background: rgba(244, 247, 254, 0.88);
+}
+.display-root.light .track i,
+.display-root.light .ready-bar {
+  background: rgba(15, 23, 49, 0.1);
+}
+.display-root.light .track i.now {
+  background: rgba(15, 23, 49, 0.25);
+}
+.display-root.light .slot-state {
+  background: rgba(15, 23, 49, 0.07);
+}
+.display-root.light .advance {
+  color: #0b6e38;
+  background: rgba(22, 156, 83, 0.14);
+}
+.display-root.light .streak {
+  color: #b54d00;
+  background: rgba(255, 138, 60, 0.16);
+}
+.display-root.light .cabinet {
+  background: linear-gradient(180deg, #ffffff, #eef2ff);
+  box-shadow:
+    0 0 0 0.25rem var(--gold),
+    0 20px 60px -15px rgba(15, 23, 49, 0.2);
+}
+.display-root.light .reel-window {
+  background: #f6f8ff;
+  border-color: var(--border-hi);
+  box-shadow: inset 0 0 24px rgba(15, 23, 49, 0.08);
+}
+.display-root.light .reel-item {
+  color: rgba(15, 23, 49, 0.45);
+}
+.display-root.light .reel-item.hit {
+  color: var(--text);
+  text-shadow: 0 0 18px rgba(201, 130, 0, 0.35);
+}
+.display-root.light .reel-mask.top {
+  background: linear-gradient(#f6f8ff, transparent);
+}
+.display-root.light .reel-mask.bottom {
+  background: linear-gradient(transparent, #f6f8ff);
+}
+.display-root.light .rung {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: var(--border-hi);
 }

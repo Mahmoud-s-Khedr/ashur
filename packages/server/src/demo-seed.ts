@@ -1,8 +1,28 @@
 import 'dotenv/config';
 import { openDb } from './db';
 import { DEFAULTS, type Question } from '@ashour/shared';
+export function normalizeWrittenQuestions(db: ReturnType<typeof openDb>) {
+  const rows = db.prepare('SELECT id, json FROM questions').all() as { id: number; json: string }[];
+  const update = db.prepare('UPDATE questions SET json=? WHERE id=?');
+  for (const row of rows) {
+    const q = JSON.parse(row.json);
+    if ((q.stage === 2 || q.stage === 3 || q.pool === 'tiebreaker') && q.type !== 'text') {
+      const accepted = Array.isArray(q.correct)
+        ? q.correct.map(String)
+        : [String(q.options?.[q.correct as number] ?? q.correct)];
+      q.type = 'text';
+      q.options = [];
+      q.correct = accepted;
+      update.run(JSON.stringify(q), row.id);
+    }
+  }
+}
+
 export function seed(db: ReturnType<typeof openDb>) {
-  if ((db.prepare('SELECT COUNT(*) AS n FROM teams').get() as { n: number }).n) return;
+  if ((db.prepare('SELECT COUNT(*) AS n FROM teams').get() as { n: number }).n) {
+    normalizeWrittenQuestions(db);
+    return;
+  }
   const colors = ['#27d6b0', '#f8bc55', '#8f91ff', '#ff7d9f'];
   db.transaction(() => {
     for (let i = 1; i <= DEFAULTS.teamCount; i++)
@@ -59,7 +79,7 @@ export function seed(db: ReturnType<typeof openDb>) {
         pool: j < 10 ? 'tiebreaker' : 'reserve',
         difficulty: 'hard',
         category: categories[j % 4],
-        type: j < 10 ? 'numeric' : 'mcq',
+        type: j < 10 ? 'text' : 'mcq',
         body: `سؤال احتياطي تجريبي ${j + 1}: كم يساوي ${j + 1} × 2؟`,
         options: j < 10 ? [] : [String((j + 1) * 2), '0', '1', '99'],
         correct: j < 10 ? [String((j + 1) * 2)] : 0,
