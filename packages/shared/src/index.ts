@@ -114,4 +114,5 @@ export type Match = {
   finishMs: Record<number, number>;
   settings: import('./constants').Settings;
   rounds: Round[];
+  rulesShownStages: number[];
 };

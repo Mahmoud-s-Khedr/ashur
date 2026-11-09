@@ -23,7 +23,9 @@ function primaryAction(s: Snapshot, tieQuestion?: number): Action | undefined {
   const pending = (s.answers ?? []).some((a: any) => a.verdict === 'pending');
   switch (s.phase) {
     case 'IDLE':
-      return { cmd: 'round.showRules', label: t.rules };
+      return s.rulesShown
+        ? { cmd: 'lineup.announce', label: t.announce }
+        : { cmd: 'round.showRules', label: t.rules };
     case 'RULES':
       return { cmd: 'lineup.announce', label: t.announce };
     case 'HANDSHAKE':

@@ -45,6 +45,23 @@ describe('M0 foundation', () => {
     engine.dispatch('round.showRules', {}, admin);
     expect(new Engine(db).state.phase).toBe('RULES');
   });
+  it('shows rules only once per stage, even after selecting another round or restarting', () => {
+    engine.dispatch('round.showRules', {}, admin);
+    engine = new Engine(db, () => clock);
+    engine.dispatch('lineup.announce', {}, admin);
+    expect(engine.snapshot(admin).rulesShown).toBe(true);
+    // Selecting a different round is allowed from idle.
+    engine.state.phase = 'IDLE';
+    engine.dispatch('round.select', { key: '1-2' }, admin);
+    expect(() => engine.dispatch('round.showRules', {}, admin)).toThrow('Rules already shown');
+    engine.dispatch('lineup.announce', {}, admin);
+    engine.state.phase = 'IDLE';
+    engine.dispatch('round.select', { key: '2-1' }, admin);
+    expect(engine.snapshot(admin).rulesShown).toBe(false);
+    engine.dispatch('round.showRules', {}, admin);
+    engine.dispatch('competition.reset', {}, admin);
+    expect(engine.snapshot(admin).rulesShown).toBe(false);
+  });
 });
 describe('M1 Blitz', () => {
   it('rejects stage jumps during an active round without changing its progress', () => {

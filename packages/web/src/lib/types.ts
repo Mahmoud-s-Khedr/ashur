@@ -51,6 +51,7 @@ export type Snapshot = {
   categories: string[];
   roundKey: string;
   stage: 1 | 2 | 3;
+  rulesShown: boolean;
   seq: number;
   phase: Phase;
   scene: string;

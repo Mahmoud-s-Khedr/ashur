@@ -31,7 +31,7 @@ export async function seat(admin: Client, teams: Client[]) {
   for (const team of teams.slice(0, ids.length)) await team.cmd('team.ready');
 }
 export async function begin(admin: Client, teams: Client[], auto = false) {
-  await admin.cmd('round.showRules');
+  if (!admin.s.rulesShown) await admin.cmd('round.showRules');
   await admin.cmd('lineup.announce');
   await seat(admin, teams);
   if (!auto) await admin.cmd('round.start');
@@ -78,8 +78,10 @@ export async function tournament(s: Server, auto: boolean, hook?: TourHook) {
         autoDelayMs: detailed ? 1800 : 5,
       },
     });
-    await admin.cmd('round.showRules');
-    await emit('rules');
+    if (!admin.s.rulesShown) {
+      await admin.cmd('round.showRules');
+      await emit('rules');
+    }
     await admin.cmd('lineup.announce');
     await emit('lobby');
     await seat(admin, teams);

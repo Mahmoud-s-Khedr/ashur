@@ -159,7 +159,13 @@ export class Engine {
           finishMs: {},
           settings: structuredClone(DEFAULTS),
           rounds,
+          rulesShownStages: [],
         };
+    this.state.rulesShownStages ??= [
+      ...new Set(this.state.rounds.filter((r) => r.completed).map((r) => r.stage)),
+    ];
+    if (this.state.phase === 'RULES' && !this.state.rulesShownStages.includes(this.round.stage))
+      this.state.rulesShownStages.push(this.round.stage);
     this.state.spinAt ??= 0;
     this.state.settings.liveScores ??= true;
     this.state.allottedMs ??= this.state.elapsedMs + this.state.remainingMs;
@@ -328,6 +334,7 @@ export class Engine {
       finishMs: {},
       settings,
       rounds,
+      rulesShownStages: this.state.rulesShownStages,
     };
   }
   private buildSet() {
@@ -647,6 +654,7 @@ export class Engine {
         this.db.prepare('DELETE FROM answers').run();
         this.db.prepare('UPDATE devices SET team_id=NULL,seat_no=NULL').run();
         s.rounds = rounds;
+        s.rulesShownStages = [];
         this.reset('1-1');
         break;
       }
@@ -730,6 +738,11 @@ export class Engine {
       }
       case 'round.showRules':
         this.phase('IDLE');
+        this.require(
+          !s.rulesShownStages.includes(this.round.stage),
+          'Rules already shown for this stage',
+        );
+        s.rulesShownStages.push(this.round.stage);
         s.phase = 'RULES';
         break;
       case 'lineup.announce':
@@ -1416,6 +1429,7 @@ export class Engine {
       categories: stage2Categories,
       roundKey: s.roundKey,
       stage: this.round.stage,
+      rulesShown: s.rulesShownStages.includes(this.round.stage),
       seq: this.round.seq,
       phase: s.phase,
       scene: s.scene,
