@@ -26,16 +26,18 @@ Status: **Not started** · **In progress** · **Done** · **Blocked**
 
 ## 3. Separate audience questions between rounds (request 13)
 
-**Status:** Not started  
-**Commit:** —
+**Status:** Done  
+**Commit:** 3382ebe
 
-- [ ] Define how audience questions are stored, selected and managed, independently of competition questions and scores.
-- [ ] Add an operator-controlled flow after each competition round and before the next group, with projector question and answer reveal.
-- [ ] Handle round progression, refresh/reconnect and automation without skipping or repeating the audience step unintentionally.
-- [ ] Verify the flow across stages and update the operator documentation.
-- [ ] Commit this request separately.
+- [x] Define how audience questions are stored, selected and managed, independently of competition questions and scores.
+- [x] Add an operator-controlled flow after each competition round and before the next group, with projector question and answer reveal.
+- [x] Handle round progression, refresh/reconnect and automation without skipping or repeating the audience step unintentionally.
+- [x] Verify the flow across stages and update the operator documentation.
+- [x] Commit this request separately.
 
-**Decision needed:** Confirm whether “after each competition round” includes the final round, and provide or approve the audience questions and answers. The existing audience phase reuses the teams' question and does not satisfy this request.
+**Decisions:** Include the final round. The operator will enter audience questions and answers; do not preload content. The existing audience phase reuses the teams' question and does not satisfy this request.
+
+**Implementation notes:** Keep audience content and its presentation state separate from competition questions and scoring. The step must be completed after results, including the championship, before leaving that round. Guard round selection and stage jumps as well as normal progression; persist the question, reveal and completion state so refreshes and restarts cannot repeat or skip it. Automation must wait for the operator to supply and present a question.
 
 ## 4. Five valuable-prize audience questions (request 14)
 
@@ -63,3 +65,4 @@ Status: **Not started** · **In progress** · **Done** · **Blocked**
 
 - Request 1 completed in `ac10140`; Arabic and English player rendering, Blitz labels, type checking and production build verified.
 - Request 2 completed in `11be84f`; seed tests, written-answer grading, type checking and production build verified.
+- Request 3 completed in `3382ebe`; operator-entered questions, answer privacy, restart and progression guards, browser flow, simulator and real/demo manual and automatic tournaments verified.
