@@ -167,12 +167,14 @@ try {
   // Reconnect mid-round with the same persisted device token.
   teams[0].close();
   await wait(() => teams[0].ws.readyState === WebSocket.CLOSED, 'team close');
+  await wait(() => admin.s.paused, 'automatic pause on disconnect');
+  const remaining = admin.s.remainingMs;
   teams[0].s = null;
   await teams[0].connect();
   assert.equal(teams[0].s.team.id, 1);
   assert.equal(teams[0].s.ownProgress, 1);
-  await admin.cmd('round.pause');
-  await wait(() => teams[0].s.paused, 'pause');
+  assert(teams[0].s.paused);
+  assert.equal(teams[0].s.remainingMs, remaining);
   await assert.rejects(
     teams[0].cmd('answer.submit', { roundQuestionId: teams[0].s.question?.id ?? first, answer: 0 }),
     /paused/,

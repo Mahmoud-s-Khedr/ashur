@@ -211,8 +211,21 @@ wss.on('connection', (ws, req) => {
   });
   ws.on('close', () => {
     clients.delete(ws);
-    if (c.authenticated)
+    if (c.authenticated) {
+      refreshActor(c);
       db.prepare('UPDATE devices SET last_seen_at=0 WHERE id=?').run(c.actor.deviceId);
+      const s = engine.state;
+      const participants = s.phase === 'TIE_RUNNING' ? s.tieIds : engine.round.teamIds;
+      if (
+        c.actor.role === 'team' &&
+        c.actor.teamId &&
+        participants.includes(c.actor.teamId) &&
+        ['COUNTDOWN', 'RUNNING', 'TIE_RUNNING'].includes(s.phase) &&
+        !s.paused
+      ) {
+        engine.dispatch('round.pause', {}, { role: 'system', deviceId: 'disconnect' });
+      }
+    }
     broadcast();
   });
   ws.on('error', () => {});
