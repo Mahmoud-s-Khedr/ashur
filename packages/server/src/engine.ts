@@ -1437,7 +1437,8 @@ export class Engine {
         !s.paused) ||
       (actor.role === 'display' &&
         this.round.stage !== 1 &&
-        ['AUDIENCE', 'REVEAL'].includes(s.phase));
+        (['AUDIENCE', 'REVEAL'].includes(s.phase) ||
+          (this.round.stage === 2 && s.phase === 'RUNNING')));
     const reveal = admin || ['REVEAL', 'RESULTS'].includes(s.phase);
     const publicQuestion =
       q && questionVisible

@@ -218,6 +218,20 @@ export function TeamTime({
         </div>
         <RingTimer s={s} remaining={remaining} unit={unit} size={10} />
       </div>
+      {s.question && (
+        <div className="tt-question">
+          <h2>{s.question.body}</h2>
+          {s.question.type === 'mcq' && (
+            <div className="tt-options">
+              {s.question.options.map((option, i) => (
+                <span key={i}>
+                  {String.fromCharCode(65 + i)}. {option}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div className="wager-reveal">
         {s.lineup.map((team, i) => (
           <article

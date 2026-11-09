@@ -375,6 +375,35 @@ describe('M2 admin tools', () => {
   });
 });
 describe('M3 Gambler', () => {
+  it('shows the projector the question only after wagers, keeping the answer private until reveal across restart', () => {
+    const display = { role: 'display' as const, deviceId: 'display' };
+    start('2-1');
+    expect(engine.snapshot(display).question).toBeNull();
+    engine.dispatch('wheel.spin', {}, admin);
+    for (let id = 1; id <= 4; id++) {
+      engine.dispatch('card.select', { value: 5 }, team(id));
+      expect(engine.snapshot(display).question).toBeNull();
+    }
+    engine.dispatch('question.start', {}, admin);
+    const q = engine.question(engine.state.set[0])!;
+    engine = new Engine(db, () => clock);
+    expect(engine.snapshot(display).question).toMatchObject({ id: q.id, body: q.body });
+    expect(engine.snapshot(display).question).not.toHaveProperty('correct');
+    expect(engine.snapshot(display).question).not.toHaveProperty('explanation');
+    engine.dispatch('round.resume', {}, admin);
+    for (let id = 1; id <= 4; id++)
+      engine.dispatch(
+        'answer.submit',
+        { roundQuestionId: q.id, answer: q.type === 'mcq' ? q.correct : 'answer' },
+        team(id),
+      );
+    if (q.type !== 'mcq')
+      for (const a of engine.state.answers.filter((a) => a.questionId === q.id))
+        engine.dispatch('grade.set', { answerId: a.id, verdict: 'correct' }, admin);
+    expect(engine.snapshot(display).question).not.toHaveProperty('correct');
+    engine.dispatch('question.reveal', {}, admin);
+    expect(engine.snapshot(display).question?.correct).toEqual(q.correct);
+  });
   it('keeps a paused replacement question paused with a fresh timer', () => {
     start('2-1');
     engine.dispatch('wheel.spin', {}, admin);
