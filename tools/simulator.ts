@@ -198,6 +198,10 @@ try {
   console.log(
     'PASS Stage 1, deduplication, double submissions, role isolation, reconnect, pause/resume.',
   );
+  await admin.cmd('audience.save', { body: 'Audience question', answer: 'Audience answer' });
+  await admin.cmd('audience.show');
+  await admin.cmd('audience.reveal');
+  await admin.cmd('audience.finish');
   await admin.cmd('round.select', { key: '2-1' });
   await admin.cmd('round.assignTeams', { teamIds: [1, 2, 3, 4] });
   await admin.cmd('round.openHandshake');
@@ -246,6 +250,10 @@ try {
   console.log(
     `PASS Stage 2, card gating, manual grading and negative balances. Local receipt spread: min ${Math.min(...spreads).toFixed(3)} ms / max ${Math.max(...spreads).toFixed(3)} ms (loopback, not LAN).`,
   );
+  await admin.cmd('audience.save', { body: 'Audience question', answer: 'Audience answer' });
+  await admin.cmd('audience.show');
+  await admin.cmd('audience.reveal');
+  await admin.cmd('audience.finish');
   await admin.cmd('round.select', { key: '3-1' });
   await admin.cmd('round.assignTeams', { teamIds: [1, 2, 3] });
   await admin.cmd('round.openHandshake');

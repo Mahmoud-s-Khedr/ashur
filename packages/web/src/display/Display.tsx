@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { t, dir } from '../lib/i18n';
+import { t, dir, lang } from '../lib/i18n';
 import type { Snapshot } from '../lib/types';
 import { usePrevious, useTeamEffects, type DisplayEvent } from '../lib/hooks';
 import { sfx } from '../lib/sfx';
@@ -139,7 +139,24 @@ export function Display({ s, remaining, now }: { s: Snapshot; remaining: number;
             : s.stage === 1 && ['RUNNING', 'REVIEW'].includes(phase) && s.tieIds.length < 2
               ? `race-${s.roundKey}`
               : `${s.roundKey}-${phase}`;
-  if (s.scene === 'intro') scene = <Intro />;
+  if (s.audienceQuestion && ['question', 'answer'].includes(s.audienceQuestion.status))
+    scene = (
+      <section className="d-question">
+        <div className="q-block">
+          <div className="q-meta">
+            <span className="chip">{lang === 'en' ? 'Audience question' : 'سؤال الجمهور'}</span>
+          </div>
+          <h1 className="q-body">{s.audienceQuestion.body}</h1>
+          {s.audienceQuestion.status === 'answer' && (
+            <div className="model-answer">
+              <small>{t.modelAnswer}</small>
+              <b>{s.audienceQuestion.answer}</b>
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  else if (s.scene === 'intro') scene = <Intro />;
   else if (s.scene === 'bracket') scene = <BracketScene s={s} />;
   else if (s.scene === 'leaderboard')
     scene = <Leaderboard s={s} fx={fx} remaining={remaining} unit={unit} />;

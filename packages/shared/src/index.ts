@@ -85,6 +85,7 @@ export type Round = {
   teamIds: number[];
   winner?: number;
   completed?: boolean;
+  audience?: { body: string; answer: string; status: 'draft' | 'question' | 'answer' | 'done' };
 };
 export type Match = {
   version: number;

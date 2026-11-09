@@ -20,6 +20,10 @@ export type Actor = { role: Role | 'system'; deviceId: string; teamId?: number; 
 const object = z.record(z.unknown());
 const schema: Record<string, z.ZodTypeAny> = {
   'round.select': z.object({ key: z.string() }),
+  'audience.save': z.object({
+    body: z.string().trim().min(1).max(4000),
+    answer: z.string().trim().min(1).max(4000),
+  }),
   'stage.jump': z.object({ stage: z.number().int().min(1).max(3) }),
   'round.assignTeams': z.object({ teamIds: z.array(z.number().int()).min(3).max(4) }),
   'answer.submit': z.object({
@@ -97,6 +101,9 @@ const emptyCommands = new Set([
   'round.pause',
   'round.resume',
   'round.next',
+  'audience.show',
+  'audience.reveal',
+  'audience.finish',
   'question.next',
   'question.start',
   'question.reveal',
@@ -603,6 +610,11 @@ export class Engine {
       }
       case 'stage.jump': {
         this.phase('IDLE', 'RESULTS');
+        if (s.phase === 'RESULTS')
+          this.require(
+            this.round.audience?.status === 'done',
+            'Complete the audience question first',
+          );
         const target = s.rounds.find((r) => r.stage === p.stage && !r.completed);
         this.require(target, 'All rounds in this stage are complete');
         const need = target.stage === 3 ? 3 : 4;
@@ -660,6 +672,11 @@ export class Engine {
       }
       case 'round.select': {
         this.phase('IDLE', 'RESULTS');
+        if (s.phase === 'RESULTS')
+          this.require(
+            this.round.audience?.status === 'done',
+            'Complete the audience question first',
+          );
         const r = s.rounds.find((r) => r.key === p.key);
         this.require(r && !r.completed, 'Unknown or completed round');
         this.reset(r.key);
@@ -1044,8 +1061,43 @@ export class Engine {
         this.setTimer(s.settings.questionMs);
         break;
       }
+      case 'audience.save': {
+        this.phase('RESULTS');
+        this.require(
+          !this.round.audience || this.round.audience.status === 'draft',
+          'Audience question already presented',
+        );
+        this.round.audience = { body: p.body, answer: p.answer, status: 'draft' };
+        break;
+      }
+      case 'audience.show': {
+        this.phase('RESULTS');
+        this.require(this.round.audience?.status === 'draft', 'Enter an audience question first');
+        this.round.audience!.status = 'question';
+        s.scene = 'auto';
+        break;
+      }
+      case 'audience.reveal': {
+        this.phase('RESULTS');
+        this.require(
+          this.round.audience?.status === 'question',
+          'Show the audience question first',
+        );
+        this.round.audience!.status = 'answer';
+        break;
+      }
+      case 'audience.finish': {
+        this.phase('RESULTS');
+        this.require(this.round.audience?.status === 'answer', 'Reveal the audience answer first');
+        this.round.audience!.status = 'done';
+        break;
+      }
       case 'round.next': {
         this.phase('RESULTS');
+        this.require(
+          this.round.audience?.status === 'done',
+          'Complete the audience question first',
+        );
         const idx = s.rounds.indexOf(this.round);
         const next = s.rounds[idx + 1];
         this.require(next, 'Tournament finished');
@@ -1488,10 +1540,22 @@ export class Engine {
         !!id &&
         s.answers.some((a) => a.teamId === id && a.questionId === qId && a.verdict !== 'void'),
       question: publicQuestion,
+      audienceQuestion:
+        this.round.audience &&
+        (admin ||
+          (actor.role === 'display' && ['question', 'answer'].includes(this.round.audience.status)))
+          ? {
+              body: this.round.audience.body,
+              status: this.round.audience.status,
+              ...(admin || this.round.audience.status === 'answer'
+                ? { answer: this.round.audience.answer }
+                : {}),
+            }
+          : null,
       rounds:
         actor.role === 'team'
           ? []
-          : s.rounds.map((r) => ({
+          : s.rounds.map(({ audience: _audience, ...r }) => ({
               ...r,
               teams: r.teamIds.map((id) => safeTeam(teams.find((t) => t.id === id)!)),
             })),

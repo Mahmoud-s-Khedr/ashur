@@ -76,6 +76,11 @@ export type Snapshot = {
   ownCard: number | null;
   submitted: boolean;
   question: PublicQuestion | null;
+  audienceQuestion: {
+    body: string;
+    answer?: string;
+    status: 'draft' | 'question' | 'answer' | 'done';
+  } | null;
   rounds: RoundView[];
   // admin only
   teams?: (PublicTeam & { code: string })[];

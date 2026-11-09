@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { t, phaseNames, arrow } from '../lib/i18n';
+import { t, phaseNames, arrow, lang } from '../lib/i18n';
 import type { Question } from '@ashour/shared';
 import type { LineupTeam, Send, Snapshot } from '../lib/types';
 import { formatClock, toSeconds } from '../lib/hooks';
@@ -16,7 +16,26 @@ type Action = {
 };
 
 function primaryAction(s: Snapshot, tieQuestion?: number): Action | undefined {
-  if (s.stage === 3 && s.phase === 'RESULTS') return undefined;
+  if (s.phase === 'RESULTS') {
+    const a = s.audienceQuestion;
+    if (!a) return undefined;
+    if (a.status === 'draft')
+      return {
+        cmd: 'audience.show',
+        label: lang === 'en' ? 'Show audience question' : 'عرض سؤال الجمهور',
+      };
+    if (a.status === 'question')
+      return {
+        cmd: 'audience.reveal',
+        label: lang === 'en' ? 'Reveal audience answer' : 'إظهار إجابة الجمهور',
+      };
+    if (a.status === 'answer')
+      return {
+        cmd: 'audience.finish',
+        label: lang === 'en' ? 'Finish audience question' : 'إنهاء سؤال الجمهور',
+      };
+    if (s.stage === 3) return undefined;
+  }
   if (s.paused) return { cmd: 'round.resume', label: t.resume };
   const everyoneReady = s.lineup.length > 0 && s.ready.length >= s.lineup.length;
   const everyonePicked = s.lineup.every((x) => x.card !== null);
@@ -410,7 +429,25 @@ function Emergency({ s, send }: { s: Snapshot; send: Send }) {
 
 export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; remaining: number }) {
   const [tieQ, setTieQ] = useState('');
-  const action = primaryAction(s, tieQ ? Number(tieQ) : undefined);
+  const [audienceBody, setAudienceBody] = useState('');
+  const [audienceAnswer, setAudienceAnswer] = useState('');
+  useEffect(() => {
+    setAudienceBody(s.audienceQuestion?.body ?? '');
+    setAudienceAnswer(s.audienceQuestion?.answer ?? '');
+  }, [s.roundKey, s.audienceQuestion?.body, s.audienceQuestion?.answer]);
+  const nextAction = primaryAction(s, tieQ ? Number(tieQ) : undefined);
+  const audienceChanged =
+    s.audienceQuestion?.status === 'draft' &&
+    (audienceBody.trim() !== s.audienceQuestion.body ||
+      audienceAnswer.trim() !== s.audienceQuestion.answer);
+  const action =
+    nextAction && audienceChanged
+      ? {
+          ...nextAction,
+          disabled: true,
+          hint: lang === 'en' ? 'Save your changes first' : 'احفظ التغييرات أولاً',
+        }
+      : nextAction;
   const tieOptions = (s.questions ?? []).filter((q: Question) => q.pool !== 'main' && !q.used);
   const pending = (s.answers ?? []).filter((a: any) => a.verdict === 'pending');
   const total =
@@ -501,6 +538,40 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
             )}
           </div>
         </section>
+        {s.phase === 'RESULTS' &&
+          (!s.audienceQuestion || s.audienceQuestion.status === 'draft') && (
+            <Section title={lang === 'en' ? 'Audience question' : 'سؤال الجمهور'}>
+              <p>
+                {lang === 'en'
+                  ? 'Enter a separate question and answer for the audience.'
+                  : 'أدخل سؤالاً وإجابة منفصلين للجمهور.'}
+              </p>
+              <label>
+                {lang === 'en' ? 'Question' : 'السؤال'}
+                <textarea
+                  value={audienceBody}
+                  maxLength={4000}
+                  onChange={(e) => setAudienceBody(e.target.value)}
+                />
+              </label>
+              <label>
+                {lang === 'en' ? 'Answer' : 'الإجابة'}
+                <textarea
+                  value={audienceAnswer}
+                  maxLength={4000}
+                  onChange={(e) => setAudienceAnswer(e.target.value)}
+                />
+              </label>
+              <button
+                disabled={!audienceBody.trim() || !audienceAnswer.trim()}
+                onClick={() =>
+                  send('audience.save', { body: audienceBody, answer: audienceAnswer })
+                }
+              >
+                {lang === 'en' ? 'Save audience question' : 'حفظ سؤال الجمهور'}
+              </button>
+            </Section>
+          )}
         {s.phase === 'RESULTS' && winner && (
           <div className="winner-strip">
             <Crown />
@@ -597,7 +668,10 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
               <button
                 className={s.stage === st ? 'selected' : ''}
                 key={st}
-                disabled={!['IDLE', 'RESULTS'].includes(s.phase)}
+                disabled={
+                  !['IDLE', 'RESULTS'].includes(s.phase) ||
+                  (s.phase === 'RESULTS' && s.audienceQuestion?.status !== 'done')
+                }
                 onClick={() => send('stage.jump', { stage: st })}
               >
                 {name}
@@ -609,7 +683,10 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
               {t.selectRound}
               <select
                 value={s.roundKey}
-                disabled={!['IDLE', 'RESULTS'].includes(s.phase)}
+                disabled={
+                  !['IDLE', 'RESULTS'].includes(s.phase) ||
+                  (s.phase === 'RESULTS' && s.audienceQuestion?.status !== 'done')
+                }
                 onChange={(e) => send('round.select', { key: e.target.value })}
               >
                 {s.rounds.map((r) => (

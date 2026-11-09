@@ -8,7 +8,7 @@ import WebSocket from 'ws';
 
 import { browserOperations } from './e2e-browser';
 import { Server, Client, output, results, sleep, until } from './test-harness';
-import { tournament, seat, begin } from './tournament';
+import { tournament, seat, begin, finishAudience } from './tournament';
 
 async function scenario(name: string, run: (s: Server) => Promise<void>, bank = 'demo') {
   const s = new Server(bank);
@@ -215,6 +215,7 @@ async function operations(s: Server) {
   await admin.cmd('score.adjust', { teamId: 1, delta: 5, reason: 'Resolve tie' });
   assert.equal(admin.s.phase, 'RESULTS');
   assert.equal(admin.s.winner, 1);
+  await finishAudience(admin);
   await admin.cmd('round.select', { key: '2-1' });
   await admin.cmd('round.assignTeams', { teamIds: [1, 2, 3, 4] });
   await admin.cmd('settings.update', { settings: { automation: 'manual' } });

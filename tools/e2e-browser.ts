@@ -249,6 +249,8 @@ export async function browserOperations(s: Server) {
         if (index === 0 && i === 0) {
           await until(() => team.state.ownProgress === 1, 'first answer');
           await team.page.reload();
+          await until(() => observer.s.paused, 'reload pauses round');
+          await observer.cmd('round.resume');
           await until(
             () => team.state.ownProgress === 1 && !!team.state.question,
             'refresh restored question',
@@ -260,6 +262,8 @@ export async function browserOperations(s: Server) {
           await expect(team.page.locator('.connection')).toContainText('Online', {
             timeout: 10000,
           });
+          await until(() => observer.s.paused, 'disconnect pauses round');
+          await observer.cmd('round.resume');
           assert.equal(team.state.ownProgress, 1);
         }
       }
@@ -287,6 +291,15 @@ export async function browserOperations(s: Server) {
         })),
     });
     async function startStage(key: string, teamIds: number[]) {
+      await p.getByLabel('Question', { exact: true }).fill('Audience browser question');
+      await p.getByLabel('Answer', { exact: true }).fill('Audience browser answer');
+      await p.getByRole('button', { name: 'Save audience question' }).click();
+      await p.getByRole('button', { name: /Show audience question/ }).click();
+      await expect(display.page.getByText('Audience browser question')).toBeVisible();
+      await expect(display.page.getByText('Audience browser answer')).toHaveCount(0);
+      await p.getByRole('button', { name: /Reveal audience answer/ }).click();
+      await expect(display.page.getByText('Audience browser answer')).toBeVisible();
+      await p.getByRole('button', { name: /Finish audience question/ }).click();
       await observer.cmd('round.select', { key });
       await observer.cmd('round.assignTeams', { teamIds });
       await until(() => admin.state.phase === 'IDLE', 'browser stage setup');

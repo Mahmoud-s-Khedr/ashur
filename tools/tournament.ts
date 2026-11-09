@@ -37,6 +37,15 @@ export async function begin(admin: Client, teams: Client[], auto = false) {
   if (!auto) await admin.cmd('round.start');
   await until(() => ['RUNNING', 'WHEEL', 'CARD_PICK'].includes(admin.s.phase), 'round start');
 }
+export async function finishAudience(admin: Client) {
+  await admin.cmd('audience.save', {
+    body: 'Audience rehearsal question',
+    answer: 'Audience rehearsal answer',
+  });
+  await admin.cmd('audience.show');
+  await admin.cmd('audience.reveal');
+  await admin.cmd('audience.finish');
+}
 export type TourHook = (event: string, admin: Client, teams: Client[]) => Promise<void>;
 export async function answer(admin: Client, team: Client, right: boolean) {
   await until(() => !!team.s.question && !team.s.submitted, 'team question');
@@ -204,6 +213,7 @@ export async function tournament(s: Server, auto: boolean, hook?: TourHook) {
     console.log(
       `  ${s.bank}/${auto ? 'auto' : 'manual'} round ${round + 1}/16: winner ${ids[0]}, scores ${expected}`,
     );
+    await finishAudience(admin);
     if (round < 15) await admin.cmd('round.next');
   }
   const data = await admin.export();

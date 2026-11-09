@@ -40,7 +40,13 @@ The header shows the authoritative phase and automation mode. The main green but
 3. Start, or let auto mode start after readiness. The actual answer period begins after the countdown. All teams receive the same ten MCQs, independently moving forward after submission.
 4. The server scores each first answer and marks every displayed question used. No verdict is shown to competitors. Only fully completed sets qualify for speed bonus: under 90 s +15, 90–<100 s +10, 100–110 s +5, above 110 s 0.
 5. When all teams finish or time expires, the server determines the top score. A unique winner is published and advances in the bracket. A tied top score goes to **مراجعة النتائج**; use the tie-breaker procedure below.
-6. **الجولة التالية** clears device bindings and prepares the next round. Give the next seated teams their codes.
+6. Complete the separate audience question described below, then **الجولة التالية** clears device bindings and prepares the next round. Give the next seated teams their codes.
+
+## Separate audience question after each round
+
+After the results of every competition round, including the final, enter a question and answer in **سؤال الجمهور** and save it. The hero button then shows the question on the projector, reveals its answer, and finishes the audience step in that order. The operator supplies the content; none is preloaded. The question belongs to that round and is stored independently of the competition bank and team scores. It can be edited before it is shown. Refreshing or restarting restores its current presentation state; automatic mode waits for the operator. Finish the audience step before selecting another round or stage. After the final, finishing returns the projector to the champion celebration.
+
+This is separate from the existing Gambler and Final Climb question review, which displays the teams' competition question after their submissions.
 
 ## Gambler: حظك نحس
 

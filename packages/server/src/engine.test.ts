@@ -6,6 +6,12 @@ let db: ReturnType<typeof openDb>, engine: Engine;
 let clock = 0;
 const admin = { role: 'admin' as const, deviceId: 'admin' };
 const team = (teamId: number) => ({ role: 'team' as const, deviceId: `team-${teamId}`, teamId });
+function finishAudience() {
+  engine.dispatch('audience.save', { body: 'Audience question', answer: 'Audience answer' }, admin);
+  engine.dispatch('audience.show', {}, admin);
+  engine.dispatch('audience.reveal', {}, admin);
+  engine.dispatch('audience.finish', {}, admin);
+}
 function start(key = '1-1') {
   engine.dispatch('settings.update', { settings: { automation: 'manual', countdownMs: 1 } }, admin);
   if (key !== '1-1') engine.dispatch('round.select', { key }, admin);
@@ -31,6 +37,42 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe('M0 foundation', () => {
+  it('persists an independent audience question and guards progression until its answer is revealed', () => {
+    engine.state.phase = 'RESULTS';
+    engine.round.completed = true;
+    engine.dispatch('automation.set', { mode: 'auto' }, admin);
+    engine.dispatch('system.tick', {}, { role: 'system', deviceId: 'timer' });
+    expect(engine.state.phase).toBe('RESULTS');
+    expect(engine.round.audience).toBeUndefined();
+    const scores = db.prepare('SELECT * FROM score_events').all();
+    for (const command of ['round.next', 'round.select', 'stage.jump']) {
+      const payload =
+        command === 'round.select' ? { key: '1-2' } : command === 'stage.jump' ? { stage: 2 } : {};
+      expect(() => engine.dispatch(command, payload, admin)).toThrow(
+        'Complete the audience question first',
+      );
+    }
+    engine.dispatch('audience.save', { body: 'Separate question', answer: 'Secret answer' }, admin);
+    expect(JSON.stringify(engine.snapshot({ role: 'display', deviceId: 'display' }))).not.toContain(
+      'Secret answer',
+    );
+    engine.dispatch('audience.show', {}, admin);
+    engine = new Engine(db, () => clock);
+    const display = { role: 'display' as const, deviceId: 'display' };
+    expect(engine.snapshot(display).audienceQuestion).toEqual({
+      body: 'Separate question',
+      status: 'question',
+    });
+    expect(JSON.stringify(engine.snapshot(team(1)))).not.toContain('Secret answer');
+    expect(() => engine.dispatch('audience.finish', {}, admin)).toThrow();
+    engine.dispatch('audience.reveal', {}, admin);
+    expect(engine.snapshot(display).audienceQuestion?.answer).toBe('Secret answer');
+    engine.dispatch('audience.finish', {}, admin);
+    expect(db.prepare('SELECT * FROM score_events').all()).toEqual(scores);
+    engine.dispatch('round.next', {}, admin);
+    expect(engine.state.roundKey).toBe('1-2');
+    expect(engine.round.audience).toBeUndefined();
+  });
   it('seeds exactly 48 teams and 180 questions', () => {
     expect(engine.teams()).toHaveLength(48);
     expect(engine.questions()).toHaveLength(180);
@@ -97,7 +139,7 @@ describe('M1 Blitz', () => {
     const answers = db.prepare('SELECT * FROM answers').all();
 
     expect(() => engine.dispatch('stage.jump', { stage: 1 }, admin)).toThrow(
-      'All rounds in this stage are complete',
+      'Complete the audience question first',
     );
     expect(engine.state).toEqual(before);
     expect(engine.questions()).toEqual(questions);
@@ -490,6 +532,7 @@ describe('full 48-team tournament', () => {
           );
         }
       expect(engine.state.winner).toBe(ids[0]);
+      finishAudience();
       engine.dispatch('round.next', {}, admin);
     }
     expect(engine.state.rounds.filter((r) => r.stage === 1 && r.winner)).toHaveLength(12);
@@ -531,6 +574,7 @@ describe('full 48-team tournament', () => {
         engine.dispatch('question.reveal', {}, admin);
         if (i < 7) engine.dispatch('question.next', {}, admin);
       }
+      finishAudience();
       engine.dispatch('round.next', {}, admin);
     }
     expect(engine.round.teamIds).toHaveLength(3);
@@ -568,6 +612,8 @@ describe('full 48-team tournament', () => {
     expect(engine.state.winner).toBe(1);
     expect(engine.teams().filter((t) => t.status === 'champion')).toHaveLength(1);
     expect(engine.state.rounds.every((r) => r.completed)).toBe(true);
+    finishAudience();
+    expect(engine.round.audience?.status).toBe('done');
   });
 });
 describe('operator overrides and final fallback', () => {
