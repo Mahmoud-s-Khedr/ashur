@@ -41,15 +41,15 @@ Status: **Not started** · **In progress** · **Done** · **Blocked**
 
 ## 4. Five valuable-prize audience questions (request 14)
 
-**Status:** Not started  
-**Commit:** —
+**Status:** Done  
+**Commit:** 8b0f3e1
 
-- [ ] Build on the separate audience-question flow to identify and present five difficult prize questions.
-- [ ] Add operator controls for the agreed placement, question progression and answer reveal; keep prize questions separate from team scoring.
-- [ ] Verify all five questions can be presented once in the intended sequence and that competition progression remains intact.
-- [ ] Update operator documentation and commit this request separately.
+- [x] Build on the separate audience-question flow to identify and present five difficult prize questions.
+- [x] Add operator controls for the agreed placement, question progression and answer reveal; keep prize questions separate from team scoring.
+- [x] Verify all five questions can be presented once in the intended sequence and that competition progression remains intact.
+- [x] Update operator documentation and commit this request separately.
 
-**Decision needed:** Confirm where the five questions appear between Blitz and Final Climb, and provide or approve the five questions and answers.
+**Decision:** The operator chooses when to present each prize question after any match, and enters its question and answer.
 
 ## 5. Show Gambler question on projector (request 15)
 
@@ -67,3 +67,4 @@ Status: **Not started** · **In progress** · **Done** · **Blocked**
 - Request 2 completed in `11be84f`; seed tests, written-answer grading, type checking and production build verified.
 - Request 3 completed in `3382ebe`; operator-entered questions, answer privacy, restart and progression guards, browser flow, simulator and real/demo manual and automatic tournaments verified.
 - Request 5 completed in `70887f8`; projector snapshot visibility across wagers, restart and reveal, Arabic and English rendering, type checking and production build verified.
+- Request 4 completed in `8b0f3e1`; operator-chosen placement, five-question progression, answer privacy, restart recovery, score isolation, test suite, type checking and production build verified.
