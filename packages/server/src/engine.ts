@@ -595,16 +595,9 @@ export class Engine {
         break;
       }
       case 'stage.jump': {
-        const target =
-          s.rounds.find((r) => r.stage === p.stage && !r.completed) ??
-          s.rounds.find((r) => r.stage === p.stage);
-        this.require(target, 'Unknown stage');
-        if (target.completed) {
-          target.completed = false;
-          target.winner = undefined;
-          this.db.prepare('DELETE FROM score_events WHERE round_key=?').run(target.key);
-          this.db.prepare('DELETE FROM answers WHERE round_key=?').run(target.key);
-        }
+        this.phase('IDLE', 'RESULTS');
+        const target = s.rounds.find((r) => r.stage === p.stage && !r.completed);
+        this.require(target, 'All rounds in this stage are complete');
         const need = target.stage === 3 ? 3 : 4;
         if (target.teamIds.length !== need) {
           const allTeams = this.teams();

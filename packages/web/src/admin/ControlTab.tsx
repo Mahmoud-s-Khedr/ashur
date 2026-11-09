@@ -595,6 +595,7 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
               <button
                 className={s.stage === st ? 'selected' : ''}
                 key={st}
+                disabled={!['IDLE', 'RESULTS'].includes(s.phase)}
                 onClick={() => send('stage.jump', { stage: st })}
               >
                 {name}
