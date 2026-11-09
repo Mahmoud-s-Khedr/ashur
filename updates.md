@@ -15,14 +15,14 @@ Status: **Not started** · **In progress** · **Done** · **Blocked**
 
 ## 2. Seed written-answer questions (request 12)
 
-**Status:** Not started  
-**Commit:** —
+**Status:** Done  
+**Commit:** 11be84f
 
-- [ ] Update the question-generation/seeding source so Gambler and Final Climb questions are written-answer questions, retaining their model answers.
-- [ ] Regenerate the bundled question bank and check both the real and demo seed paths as applicable.
-- [ ] Verify question counts and types, written-answer submission and manual grading; update seed tests and documentation as needed.
-- [ ] Document how existing databases receive the updated questions without overwriting active or used data. Seeding an empty database alone does not update an existing bank.
-- [ ] Commit this request separately.
+- [x] Update the question-generation/seeding source so Gambler and Final Climb questions are written-answer questions, retaining their model answers.
+- [x] Regenerate the bundled question bank and check both the real and demo seed paths as applicable.
+- [x] Verify question counts and types, written-answer submission and manual grading; update seed tests and documentation as needed.
+- [x] Document how existing databases receive the updated questions without overwriting active or used data. Seeding an empty database alone does not update an existing bank.
+- [x] Commit this request separately.
 
 ## 3. Separate audience questions between rounds (request 13)
 
@@ -62,3 +62,4 @@ Status: **Not started** · **In progress** · **Done** · **Blocked**
 ## Progress log
 
 - Request 1 completed in `ac10140`; Arabic and English player rendering, Blitz labels, type checking and production build verified.
+- Request 2 completed in `11be84f`; seed tests, written-answer grading, type checking and production build verified.
