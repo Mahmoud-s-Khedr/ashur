@@ -21,12 +21,12 @@ const object = z.record(z.unknown());
 const schema: Record<string, z.ZodTypeAny> = {
   'round.select': z.object({ key: z.string() }),
   'audience.save': z.object({
-    body: z.string().trim().min(1).max(4000),
-    answer: z.string().trim().min(1).max(4000),
+    body: z.string().trim().min(1).max(4000).optional(),
+    answer: z.string().trim().min(1).max(4000).optional(),
   }),
   'prize.save': z.object({
-    body: z.string().trim().min(1).max(4000),
-    answer: z.string().trim().min(1).max(4000),
+    body: z.string().trim().min(1).max(4000).optional(),
+    answer: z.string().trim().min(1).max(4000).optional(),
   }),
   'stage.jump': z.object({ stage: z.number().int().min(1).max(3) }),
   'round.assignTeams': z.object({ teamIds: z.array(z.number().int()).min(3).max(4) }),
@@ -185,6 +185,7 @@ export class Engine {
     this.state.allottedMs ??= this.state.elapsedMs + this.state.remainingMs;
     this.origin = this.clock();
     this.originElapsed = this.state.elapsedMs;
+    this.normalizeWrittenBank();
     if (['RUNNING', 'COUNTDOWN', 'TIE_RUNNING'].includes(this.state.phase) && !this.state.paused) {
       this.state.paused = true;
       this.state.endsAt = 0;
@@ -217,6 +218,45 @@ export class Engine {
   }
   question(id: number) {
     return this.questions().find((q) => q.id === id);
+  }
+  private ensureWrittenQuestion(q: Question): Question {
+    if (q.type !== 'mcq') return q;
+    const accepted = Array.isArray(q.correct)
+      ? q.correct.map(String)
+      : [String(q.options?.[q.correct as number] ?? q.correct)];
+    const { used: _used, deleted: _deleted, ...raw } = q;
+    const updated: Question = {
+      ...raw,
+      type: 'text',
+      options: [],
+      correct: accepted,
+    };
+    this.db.prepare('UPDATE questions SET json=? WHERE id=?').run(JSON.stringify(updated), q.id);
+    this.bank = null;
+    return { ...updated, used: q.used };
+  }
+  private normalizeWrittenBank() {
+    const rows = this.db.prepare('SELECT id, json FROM questions').all() as {
+      id: number;
+      json: string;
+    }[];
+    const update = this.db.prepare('UPDATE questions SET json=? WHERE id=?');
+    for (const row of rows) {
+      const q = JSON.parse(row.json);
+      if (
+        ((q.stage === 2 || q.stage === 3) && q.type === 'mcq') ||
+        (q.pool === 'tiebreaker' && q.type !== 'text')
+      ) {
+        const accepted = Array.isArray(q.correct)
+          ? q.correct.map(String)
+          : [String(q.options?.[q.correct as number] ?? q.correct)];
+        q.type = 'text';
+        q.options = [];
+        q.correct = accepted;
+        update.run(JSON.stringify(q), row.id);
+      }
+    }
+    this.bank = null;
   }
   scores() {
     const rows = this.db
@@ -349,8 +389,93 @@ export class Engine {
       settings,
       rounds,
       rulesShownStages: this.state.rulesShownStages,
+      usedExtraIds: this.state.usedExtraIds,
       prizeQuestions: this.state.prizeQuestions,
     };
+  }
+  private questionAnswerText(q: Question): string {
+    return q.type === 'mcq'
+      ? (q.options[q.correct as number] ?? String(q.correct))
+      : Array.isArray(q.correct)
+        ? q.correct.join(' / ')
+        : String(q.correct);
+  }
+  private isPrizeWindow(): boolean {
+    return (
+      this.round.stage === 2 &&
+      this.state.rounds.filter((r) => r.stage === 2).every((r) => r.completed) &&
+      !this.state.rounds.some((r) => r.stage === 3 && r.completed)
+    );
+  }
+  private pickBankQuestion(preferHard = false): Question {
+    const s = this.state;
+    const all = this.questions();
+    const extraIds = new Set<number>(s.usedExtraIds ?? []);
+    const takenIds = new Set<number>(extraIds);
+    const takenBodies = new Set<string>();
+    for (const q of all) {
+      if (q.used || extraIds.has(q.id)) {
+        takenIds.add(q.id);
+        takenBodies.add(q.body);
+      }
+    }
+    for (const r of s.rounds) {
+      if (r.audience?.questionId) takenIds.add(r.audience.questionId);
+      if (r.audience?.body) takenBodies.add(r.audience.body);
+    }
+    for (const p of s.prizeQuestions ?? []) {
+      if (p.questionId) takenIds.add(p.questionId);
+      if (p.body) takenBodies.add(p.body);
+    }
+    for (const id of s.set) takenIds.add(id);
+    if (s.tieQuestion) takenIds.add(s.tieQuestion);
+
+    const uncompletedStage1 = new Set(
+      s.rounds.filter((r) => r.stage === 1 && !r.completed).map((r) => r.seq),
+    );
+    const stage2Incomplete = s.rounds.some((r) => r.stage === 2 && !r.completed);
+    const stage3Incomplete = s.rounds.some((r) => r.stage === 3 && !r.completed);
+    const lockedMain = (q: Question) =>
+      q.pool === 'main' &&
+      ((q.stage === 1 && q.setNo !== null && uncompletedStage1.has(q.setNo)) ||
+        (q.stage === 2 && stage2Incomplete) ||
+        (q.stage === 3 && stage3Incomplete));
+
+    const unchosen = all.filter((q) => !takenIds.has(q.id));
+    this.require(unchosen.length, 'No unused questions left in bank');
+    const unlocked = unchosen.filter((q) => !lockedMain(q));
+    const base = unlocked.length ? unlocked : unchosen;
+    const uniqueBody = base.filter((q) => !takenBodies.has(q.body));
+    const pool0 = uniqueBody.length ? uniqueBody : base;
+    const nonTie = pool0.filter((q) => q.pool !== 'tiebreaker');
+    const pool1 = nonTie.length ? nonTie : pool0;
+    const hardPool = preferHard
+      ? pool1.filter((q) => q.difficulty === 'hard' || q.difficulty === 'joker')
+      : [];
+    const pool = hardPool.length ? hardPool : pool1;
+    const picked = pool[randomInt(pool.length)];
+    (s.usedExtraIds ??= []).push(picked.id);
+    if (!lockedMain(picked)) this.use(picked.id);
+    return picked;
+  }
+  private assignAudienceQuestion() {
+    const q = this.pickBankQuestion();
+    this.round.audience = {
+      questionId: q.id,
+      body: q.body,
+      answer: this.questionAnswerText(q),
+      status: 'draft',
+    };
+  }
+  private assignPrizeQuestion() {
+    const q = this.pickBankQuestion(true);
+    (this.state.prizeQuestions ??= []).push({
+      questionId: q.id,
+      body: q.body,
+      answer: this.questionAnswerText(q),
+      status: 'draft',
+      roundKey: this.state.roundKey,
+    });
   }
   private buildSet() {
     const s = this.state,
@@ -500,6 +625,7 @@ export class Engine {
         .filter((r) => r.stage === 2)
         .map((r) => r.winner)
         .filter((id): id is number => !!id);
+    if (!this.round.audience) this.assignAudienceQuestion();
   }
   private refreshRankingAfterAdjustment() {
     const s = this.state;
@@ -618,15 +744,18 @@ export class Engine {
       }
       case 'stage.jump': {
         this.phase('IDLE', 'RESULTS');
-        this.require(
-          !s.prizeQuestions?.some((q) => q.status !== 'done'),
-          'Finish the prize question first',
-        );
         if (s.phase === 'RESULTS')
           this.require(
             this.round.audience?.status === 'done',
             'Complete the audience question first',
           );
+        this.require(
+          !s.prizeQuestions?.some((q) => q.status !== 'done') &&
+            (s.phase !== 'RESULTS' ||
+              !this.isPrizeWindow() ||
+              (s.prizeQuestions?.filter((q) => q.status === 'done').length ?? 0) >= 5),
+          'Finish the prize question first',
+        );
         const target = s.rounds.find((r) => r.stage === p.stage && !r.completed);
         this.require(target, 'All rounds in this stage are complete');
         const need = target.stage === 3 ? 3 : 4;
@@ -679,21 +808,25 @@ export class Engine {
         this.db.prepare('UPDATE devices SET team_id=NULL,seat_no=NULL').run();
         s.rounds = rounds;
         s.rulesShownStages = [];
+        s.usedExtraIds = [];
         s.prizeQuestions = [];
         this.reset('1-1');
         break;
       }
       case 'round.select': {
         this.phase('IDLE', 'RESULTS');
-        this.require(
-          !s.prizeQuestions?.some((q) => q.status !== 'done'),
-          'Finish the prize question first',
-        );
         if (s.phase === 'RESULTS')
           this.require(
             this.round.audience?.status === 'done',
             'Complete the audience question first',
           );
+        this.require(
+          !s.prizeQuestions?.some((q) => q.status !== 'done') &&
+            (s.phase !== 'RESULTS' ||
+              !this.isPrizeWindow() ||
+              (s.prizeQuestions?.filter((q) => q.status === 'done').length ?? 0) >= 5),
+          'Finish the prize question first',
+        );
         const r = s.rounds.find((r) => r.key === p.key);
         this.require(r && !r.completed, 'Unknown or completed round');
         this.reset(r.key);
@@ -1069,9 +1202,12 @@ export class Engine {
           s.tieIds.every((id) => s.ready.includes(id)),
           'Tied teams are not ready',
         );
-        const qs = this.questions().filter((q) => q.pool !== 'main' && !q.used);
-        const q = p.questionId ? qs.find((q) => q.id === p.questionId) : qs[0];
-        this.require(q, 'No unused tie-breaker question');
+        const qs = this.questions()
+          .filter((q) => q.pool !== 'main' && !q.used)
+          .sort((a, b) => (a.pool === 'tiebreaker' ? -1 : 1) - (b.pool === 'tiebreaker' ? -1 : 1));
+        const picked = p.questionId ? qs.find((q) => q.id === p.questionId) : qs[0];
+        this.require(picked, 'No unused tie-breaker question');
+        const q = this.ensureWrittenQuestion(picked);
         s.tieQuestion = q.id;
         this.use(q.id);
         s.phase = 'TIE_RUNNING';
@@ -1084,12 +1220,24 @@ export class Engine {
           !this.round.audience || this.round.audience.status === 'draft',
           'Audience question already presented',
         );
-        this.round.audience = { body: p.body, answer: p.answer, status: 'draft' };
+        this.require(
+          (!p.body && !p.answer) || (!!p.body && !!p.answer),
+          'Provide both question and answer or neither for random selection',
+        );
+        if (p.body && p.answer) {
+          this.round.audience = { body: p.body, answer: p.answer, status: 'draft' };
+        } else {
+          this.assignAudienceQuestion();
+        }
         break;
       }
       case 'audience.show': {
         this.phase('RESULTS');
-        this.require(this.round.audience?.status === 'draft', 'Enter an audience question first');
+        if (!this.round.audience) this.assignAudienceQuestion();
+        this.require(
+          this.round.audience?.status === 'draft',
+          'Audience question already presented',
+        );
         this.round.audience!.status = 'question';
         s.scene = 'auto';
         break;
@@ -1107,6 +1255,13 @@ export class Engine {
         this.phase('RESULTS');
         this.require(this.round.audience?.status === 'answer', 'Reveal the audience answer first');
         this.round.audience!.status = 'done';
+        if (
+          this.isPrizeWindow() &&
+          (s.prizeQuestions ?? []).filter((q) => q.status === 'done').length < 5 &&
+          !s.prizeQuestions?.some((q) => q.status !== 'done')
+        ) {
+          this.assignPrizeQuestion();
+        }
         break;
       }
       case 'prize.save': {
@@ -1115,18 +1270,39 @@ export class Engine {
           this.round.audience?.status === 'done',
           'Complete the audience question first',
         );
+        this.require(
+          this.isPrizeWindow(),
+          'Prize questions are only available after Stage 2 is complete',
+        );
+        this.require(
+          (!p.body && !p.answer) || (!!p.body && !!p.answer),
+          'Provide both question and answer or neither for random selection',
+        );
         const prizes = (s.prizeQuestions ??= []);
         const current = prizes.at(-1);
+        const doneCount = prizes.filter((q) => q.status === 'done').length;
         if (current && current.status !== 'done') {
           this.require(
             current.status === 'draft' && current.roundKey === s.roundKey,
             'Prize question already presented',
           );
-          current.body = p.body;
-          current.answer = p.answer;
+          if (p.body && p.answer) {
+            current.questionId = undefined;
+            current.body = p.body;
+            current.answer = p.answer;
+          } else {
+            const q = this.pickBankQuestion(true);
+            current.questionId = q.id;
+            current.body = q.body;
+            current.answer = this.questionAnswerText(q);
+          }
         } else {
-          this.require(prizes.length < 5, 'All five prize questions are complete');
-          prizes.push({ body: p.body, answer: p.answer, status: 'draft', roundKey: s.roundKey });
+          this.require(doneCount < 5, 'All five prize questions are complete');
+          if (p.body && p.answer) {
+            prizes.push({ body: p.body, answer: p.answer, status: 'draft', roundKey: s.roundKey });
+          } else {
+            this.assignPrizeQuestion();
+          }
         }
         break;
       }
@@ -1134,7 +1310,23 @@ export class Engine {
       case 'prize.reveal':
       case 'prize.finish': {
         this.phase('RESULTS');
-        const current = s.prizeQuestions?.at(-1);
+        this.require(
+          this.round.audience?.status === 'done',
+          'Complete the audience question first',
+        );
+        this.require(
+          this.isPrizeWindow(),
+          'Prize questions are only available after Stage 2 is complete',
+        );
+        const prizes = (s.prizeQuestions ??= []);
+        if (type === 'prize.show' && (!prizes.length || prizes.at(-1)!.status === 'done')) {
+          this.require(
+            prizes.filter((q) => q.status === 'done').length < 5,
+            'All five prize questions are complete',
+          );
+          this.assignPrizeQuestion();
+        }
+        const current = prizes.at(-1);
         const expected =
           type === 'prize.show' ? 'draft' : type === 'prize.reveal' ? 'question' : 'answer';
         this.require(
@@ -1144,17 +1336,26 @@ export class Engine {
         current.status =
           type === 'prize.show' ? 'question' : type === 'prize.reveal' ? 'answer' : 'done';
         if (type === 'prize.show') s.scene = 'auto';
+        if (
+          type === 'prize.finish' &&
+          this.isPrizeWindow() &&
+          prizes.filter((q) => q.status === 'done').length < 5
+        ) {
+          this.assignPrizeQuestion();
+        }
         break;
       }
       case 'round.next': {
         this.phase('RESULTS');
         this.require(
-          !s.prizeQuestions?.some((q) => q.status !== 'done'),
-          'Finish the prize question first',
-        );
-        this.require(
           this.round.audience?.status === 'done',
           'Complete the audience question first',
+        );
+        this.require(
+          !s.prizeQuestions?.some((q) => q.status !== 'done') &&
+            (!this.isPrizeWindow() ||
+              (s.prizeQuestions?.filter((q) => q.status === 'done').length ?? 0) >= 5),
+          'Finish the prize question first',
         );
         const idx = s.rounds.indexOf(this.round);
         const next = s.rounds[idx + 1];
@@ -1211,10 +1412,14 @@ export class Engine {
         const reserve = this.questions().filter(
           (q) => q.pool === 'reserve' && !q.used && (this.round.stage !== 1 || q.type === 'mcq'),
         );
-        const replacement = p.replacementId
+        const pickedReplacement = p.replacementId
           ? reserve.find((q) => q.id === p.replacementId)
           : reserve.find((q) => q.difficulty === 'hard' || q.difficulty === 'joker');
-        this.require(replacement, 'No suitable unused harder reserve question');
+        this.require(pickedReplacement, 'No suitable unused harder reserve question');
+        const replacement =
+          this.round.stage === 1
+            ? pickedReplacement
+            : this.ensureWrittenQuestion(pickedReplacement);
         const cancelled = this.round.stage === 1 ? s.set.slice(index) : [old];
         const rows = this.db
           .prepare(
@@ -1602,9 +1807,11 @@ export class Engine {
       prizeQuestion: (() => {
         const prizes = s.prizeQuestions ?? [];
         const q = prizes.at(-1);
+        const eligible = this.isPrizeWindow();
         if (admin)
           return {
             count: prizes.filter((p) => p.status === 'done').length,
+            eligible,
             current: q && q.status !== 'done' ? q : null,
           };
         if (actor.role === 'display' && q && ['question', 'answer'].includes(q.status))
@@ -1623,6 +1830,9 @@ export class Engine {
         (admin ||
           (actor.role === 'display' && ['question', 'answer'].includes(this.round.audience.status)))
           ? {
+              ...(admin && this.round.audience.questionId
+                ? { questionId: this.round.audience.questionId }
+                : {}),
               body: this.round.audience.body,
               status: this.round.audience.status,
               ...(admin || this.round.audience.status === 'answer'

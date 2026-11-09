@@ -382,6 +382,8 @@ export const ar = {
   confirmResetCompetition:
     'هل أنت متأكد؟ سيتم تصفير كل الجولات والنقاط والفرق المتأهلة وإعادة استخدام الأسئلة للبدء من جديد.',
   jumpStage: 'الانتقال السريع للمراحل',
+  lightTheme: 'الوضع الفاتح',
+  darkTheme: 'الوضع الداكن',
 };
 export const phaseNames: Record<string, string> = {
   IDLE: 'تحضير',

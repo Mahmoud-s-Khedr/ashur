@@ -37,6 +37,8 @@ export const questionSchema = z
       ctx.addIssue({ code: 'custom', message: 'Text/numeric needs accepted answers' });
     if (q.stage === 1 && q.type !== 'mcq')
       ctx.addIssue({ code: 'custom', message: 'Blitz requires MCQ' });
+    if ((q.stage === 2 || q.stage === 3) && q.type === 'mcq')
+      ctx.addIssue({ code: 'custom', message: 'Stages 2 and 3 require written questions' });
   });
 export type Question = z.infer<typeof questionSchema> & {
   id: number;
@@ -85,7 +87,12 @@ export type Round = {
   teamIds: number[];
   winner?: number;
   completed?: boolean;
-  audience?: { body: string; answer: string; status: 'draft' | 'question' | 'answer' | 'done' };
+  audience?: {
+    questionId?: number;
+    body: string;
+    answer: string;
+    status: 'draft' | 'question' | 'answer' | 'done';
+  };
 };
 export type Match = {
   version: number;
@@ -116,7 +123,9 @@ export type Match = {
   settings: import('./constants').Settings;
   rounds: Round[];
   rulesShownStages: number[];
+  usedExtraIds?: number[];
   prizeQuestions?: {
+    questionId?: number;
     body: string;
     answer: string;
     status: 'draft' | 'question' | 'answer' | 'done';

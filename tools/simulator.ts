@@ -198,7 +198,6 @@ try {
   console.log(
     'PASS Stage 1, deduplication, double submissions, role isolation, reconnect, pause/resume.',
   );
-  await admin.cmd('audience.save', { body: 'Audience question', answer: 'Audience answer' });
   await admin.cmd('audience.show');
   await admin.cmd('audience.reveal');
   await admin.cmd('audience.finish');
@@ -250,7 +249,6 @@ try {
   console.log(
     `PASS Stage 2, card gating, manual grading and negative balances. Local receipt spread: min ${Math.min(...spreads).toFixed(3)} ms / max ${Math.max(...spreads).toFixed(3)} ms (loopback, not LAN).`,
   );
-  await admin.cmd('audience.save', { body: 'Audience question', answer: 'Audience answer' });
   await admin.cmd('audience.show');
   await admin.cmd('audience.reveal');
   await admin.cmd('audience.finish');

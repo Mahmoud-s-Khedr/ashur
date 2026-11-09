@@ -78,13 +78,16 @@ export type Snapshot = {
   question: PublicQuestion | null;
   prizeQuestion?: {
     count: number;
+    eligible?: boolean;
     current: {
+      questionId?: number;
       body: string;
       answer?: string;
       status: 'draft' | 'question' | 'answer' | 'done';
     } | null;
   } | null;
   audienceQuestion: {
+    questionId?: number;
     body: string;
     answer?: string;
     status: 'draft' | 'question' | 'answer' | 'done';
