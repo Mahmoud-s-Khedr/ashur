@@ -957,4 +957,34 @@ describe('presentation support', () => {
       ),
     ).toThrow();
   });
+  it('allows configuring the number of rounds in each stage and teams per round in settings', () => {
+    engine.dispatch(
+      'settings.update',
+      {
+        settings: {
+          stage1Rounds: 6,
+          stage1TeamsPerRound: 3,
+          stage2Rounds: 2,
+          stage2TeamsPerRound: 3,
+          stage3Rounds: 1,
+          stage3TeamsPerRound: 2,
+        },
+      },
+      admin,
+    );
+    expect(engine.state.settings.teamCount).toBe(18);
+    expect(engine.state.settings.stage2Mapping).toEqual([
+      [1, 2, 3],
+      [4, 5, 6],
+    ]);
+    expect(engine.state.rounds.filter((r) => r.stage === 1)).toHaveLength(6);
+    expect(engine.state.rounds.filter((r) => r.stage === 2)).toHaveLength(2);
+    expect(engine.state.rounds.filter((r) => r.stage === 3)).toHaveLength(1);
+    expect(engine.state.rounds.find((r) => r.key === '1-1')!.teamIds).toEqual([1, 2, 3]);
+    expect(engine.state.rounds.find((r) => r.key === '1-2')!.teamIds).toEqual([4, 5, 6]);
+    engine.dispatch('stage.jump', { stage: 2 }, admin);
+    expect(engine.round.teamIds).toHaveLength(3);
+    engine.dispatch('stage.jump', { stage: 3 }, admin);
+    expect(engine.round.teamIds).toHaveLength(2);
+  });
 });

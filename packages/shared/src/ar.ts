@@ -81,7 +81,7 @@ export const ar = {
   winner: 'الفائز',
   champion: 'بطل مسابقة عاشور',
   results: 'نتائج الجولة',
-  leadersTie: 'تعادل في الصدارة',
+  leadersTie: 'تعادل',
   ladder: 'سلم عاشور',
   enableSound: 'تفعيل الصوت',
   intro: 'مرحباً بكم في مسابقة عاشور',
@@ -384,6 +384,10 @@ export const ar = {
   jumpStage: 'الانتقال السريع للمراحل',
   lightTheme: 'الوضع الفاتح',
   darkTheme: 'الوضع الداكن',
+  tournamentStructure: 'هيكل المسابقة (الجولات والفرق)',
+  roundsInStage: 'عدد الجولات',
+  teamsPerRound: 'عدد الفرق في كل جولة',
+  qualifiersPerRound: 'عدد المتأهلين من كل جولة',
 };
 export const phaseNames: Record<string, string> = {
   IDLE: 'تحضير',

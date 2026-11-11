@@ -24,9 +24,15 @@ export function BracketTab({ s, send }: { s: Snapshot; send: Send }) {
       .map((id) => teams.find((x) => x.id === id))
       .filter((x): x is NonNullable<typeof x> => !!x),
   }));
+  const slotsFor = (stage: number) =>
+    stage === 1
+      ? (s.settings.stage1TeamsPerRound ?? 4)
+      : stage === 2
+        ? (s.settings.stage2TeamsPerRound ?? 4)
+        : (s.settings.stage3TeamsPerRound ?? 3);
   const full = (key: string) => {
     const r = s.rounds.find((x) => x.key === key)!;
-    return merged(key).length === (r.stage === 3 ? 3 : 4);
+    return merged(key).length === slotsFor(r.stage);
   };
   const swap = (a: SwapRef, b: SwapRef) => {
     if (!editable || (a.key === b.key && a.teamId === b.teamId)) return;
@@ -44,10 +50,11 @@ export function BracketTab({ s, send }: { s: Snapshot; send: Send }) {
     setDraft(next);
   };
   const randomize = () => {
+    const perRound = slotsFor(1);
     const open = s.rounds.filter((r) => r.stage === 1 && !r.completed);
     const pool = shuffle(open.flatMap((r) => merged(r.key)));
     const next = { ...draft };
-    open.forEach((r, i) => (next[r.key] = pool.slice(i * 4, i * 4 + 4)));
+    open.forEach((r, i) => (next[r.key] = pool.slice(i * perRound, (i + 1) * perRound)));
     setDraft(next);
   };
   const save = () => {
@@ -87,6 +94,7 @@ export function BracketTab({ s, send }: { s: Snapshot; send: Send }) {
         <div className="bracket-admin">
           <Bracket
             rounds={view}
+            settings={s.settings}
             currentKey={s.roundKey}
             dirty={dirty}
             compact

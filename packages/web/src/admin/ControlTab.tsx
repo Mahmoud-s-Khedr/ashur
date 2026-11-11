@@ -34,7 +34,8 @@ function primaryAction(s: Snapshot, tieQuestion?: number): Action | undefined {
         label: lang === 'en' ? 'Finish audience question' : 'إنهاء سؤال الجمهور',
       };
     const prize = s.prizeQuestion?.current;
-    if (prize || (s.prizeQuestion?.eligible && s.prizeQuestion.count < 5))
+    if (prize || (s.prizeQuestion?.eligible && s.prizeQuestion.count < 5)) {
+      const num = (s.prizeQuestion?.count ?? 0) + 1;
       return {
         cmd:
           !prize || prize.status === 'draft'
@@ -45,8 +46,8 @@ function primaryAction(s: Snapshot, tieQuestion?: number): Action | undefined {
         label:
           !prize || prize.status === 'draft'
             ? lang === 'en'
-              ? 'Show prize question'
-              : 'عرض سؤال الجائزة'
+              ? `Show prize question ${num}`
+              : `عرض سؤال الجائزة ${num}`
             : prize.status === 'question'
               ? lang === 'en'
                 ? 'Reveal prize answer'
@@ -54,6 +55,12 @@ function primaryAction(s: Snapshot, tieQuestion?: number): Action | undefined {
               : lang === 'en'
                 ? 'Finish prize question'
                 : 'إنهاء سؤال الجائزة',
+      };
+    }
+    if (s.stage === 2 && s.prizeQuestion?.eligible && s.prizeQuestion.count >= 5)
+      return {
+        cmd: 'round.next',
+        label: lang === 'en' ? 'Move to Ashour Ladder' : 'الانتقال إلى سلم عاشور',
       };
     if (s.stage === 3) return undefined;
   }
@@ -220,7 +227,12 @@ function TeamCard({ s, team, i, send }: { s: Snapshot; team: LineupTeam; i: numb
 }
 
 function LineupPicker({ s, send }: { s: Snapshot; send: Send }) {
-  const need = s.stage === 3 ? 3 : 4;
+  const need =
+    s.stage === 1
+      ? (s.settings.stage1TeamsPerRound ?? 4)
+      : s.stage === 2
+        ? (s.settings.stage2TeamsPerRound ?? 4)
+        : (s.settings.stage3TeamsPerRound ?? 3);
   const [lineup, setLineup] = useState<number[]>(s.lineup.map((x) => x.id));
   const [find, setFind] = useState('');
   useEffect(
@@ -483,7 +495,10 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
     JSON.stringify(action?.payload),
     send,
   ]);
-  const winner = s.lineup.find((x) => x.id === s.winner);
+  const winnerIds = s.winners?.length ? s.winners : s.winner ? [s.winner] : [];
+  const winners = winnerIds
+    .map((id) => s.lineup.find((x) => x.id === id))
+    .filter((x): x is LineupTeam => !!x);
   return (
     <div className="control-grid">
       <div className="control-main">
@@ -571,8 +586,8 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
             <Section
               title={
                 lang === 'en'
-                  ? `Prize question ${s.prizeQuestion.count + 1} of 5`
-                  : `سؤال الجائزة ${s.prizeQuestion.count + 1} من ٥`
+                  ? `Audience Prizes Segment — Question ${s.prizeQuestion.count + 1} of 5`
+                  : `فقرة جوائز الجمهور — سؤال ${s.prizeQuestion.count + 1} من ٥`
               }
             >
               {s.prizeQuestion.current ? (
@@ -596,12 +611,14 @@ export function ControlTab({ s, send, remaining }: { s: Snapshot; send: Send; re
               )}
             </Section>
           )}
-        {s.phase === 'RESULTS' && winner && (
+        {s.phase === 'RESULTS' && winners.length > 0 && (
           <div className="winner-strip">
             <Crown />
             <div>
-              <small>{s.stage === 3 ? t.champion : t.winner}</small>
-              <h2>{winner.name}</h2>
+              <small>
+                {s.stage === 3 ? t.champion : winners.length > 1 ? t.qualifiers : t.winner}
+              </small>
+              <h2>{winners.map((w) => w.name).join(' · ')}</h2>
             </div>
           </div>
         )}

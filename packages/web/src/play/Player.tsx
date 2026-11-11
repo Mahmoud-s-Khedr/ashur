@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { t, phaseNames, arrow } from '../lib/i18n';
 import type { Send, Snapshot } from '../lib/types';
 import { toSeconds, useCountUp, usePrevious } from '../lib/hooks';
+import { sfx } from '../lib/sfx';
 import { Confetti, Pips, TeamMark, cssVars, Of } from '../ui/parts';
 import { Bolt, Check, Clock, Crown, Joker, Lock, Pause, Trophy } from '../ui/icons';
 import './play.css';
@@ -42,7 +43,6 @@ function CodeEntry({
   }, [error]);
   const press = (d: string) => {
     clearError();
-    navigator.vibrate?.(12);
     setCode((c) => (c.length < 4 ? c + d : c));
   };
   useEffect(() => {
@@ -124,7 +124,6 @@ function ReadyButton({ ready, send }: { ready: boolean; send: Send }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Enter' || e.code === 'Enter' || e.code === 'NumpadEnter') {
         e.preventDefault();
-        navigator.vibrate?.([30, 40, 30]);
         send('team.ready');
       }
     };
@@ -136,7 +135,6 @@ function ReadyButton({ ready, send }: { ready: boolean; send: Send }) {
       className={`ready-orb ${ready ? 'is-ready' : ''}`}
       disabled={ready}
       onClick={() => {
-        navigator.vibrate?.([30, 40, 30]);
         send('team.ready');
       }}
     >
@@ -226,14 +224,12 @@ export function Question({
         : '';
   const answer = (i: number) => {
     if (locked) return;
-    navigator.vibrate?.(25);
     setSent(i);
     send('answer.submit', { roundQuestionId: q.id, answer: i });
   };
   const submitText = (raw = text) => {
     const cleaned = raw.replace(/[\r\n]+/g, ' ').trim();
     if (!cleaned || locked) return;
-    navigator.vibrate?.(25);
     setSent(0);
     send('answer.submit', { roundQuestionId: q.id, answer: cleaned });
   };
@@ -381,7 +377,6 @@ function CardPick({ s, send, now }: { s: Snapshot; send: Send; now: number }) {
             className={`wager-pick ${s.ownCard === value ? 'chosen' : ''} ${s.ownCard !== null && s.ownCard !== value ? 'rest' : ''}`}
             style={{ animationDelay: `${i * 0.12}s` }}
             onClick={() => {
-              navigator.vibrate?.(30);
               send('card.select', { value });
             }}
           >
@@ -425,7 +420,7 @@ function Finished({ s }: { s: Snapshot }) {
 }
 
 function Results({ s }: { s: Snapshot }) {
-  const won = s.winner === s.team!.id;
+  const won = s.winners?.length ? s.winners.includes(s.team!.id) : s.winner === s.team!.id;
   const score = useCountUp(s.ownScore ?? 0, 1200);
   return (
     <section className={`p-center results ${won ? 'won' : ''}`}>
@@ -467,6 +462,7 @@ export function Player({
     }
   }, [teamId]);
   useEffect(() => {
+    sfx.disable();
     // Kiosk behaviour: no context menu, and the browser's Back button cannot leave the game.
     const block = (e: Event) => e.preventDefault();
     const stay = () => history.pushState(null, '', location.href);

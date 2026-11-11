@@ -275,7 +275,8 @@ export function QuestionsTab({ s, send, bulk }: { s: Snapshot; send: Send; bulk:
     explanation: '',
     setNo: null,
   });
-  const sets = Array.from({ length: 12 }, (_, i) => {
+  const s1Rounds = s.settings.stage1Rounds ?? 12;
+  const sets = Array.from({ length: s1Rounds }, (_, i) => {
     const qs = questions.filter((q) => q.stage === 1 && q.pool === 'main' && q.setNo === i + 1);
     const count = Object.fromEntries(
       DIFFS.map((d) => [d, qs.filter((q) => q.difficulty === d).length]),
@@ -298,13 +299,26 @@ export function QuestionsTab({ s, send, bulk }: { s: Snapshot; send: Send; bulk:
       const haveBy = Object.fromEntries(
         DIFFS.map((d) => [d, keep.filter((q) => q.difficulty === d).slice(0, NEED[d])]),
       );
-      // Preflight so an impossible set does not consume candidates later sets could use.
-      const possible = DIFFS.every((d) => NEED[d] - haveBy[d].length <= byDiff[d].length);
+      const needEasy = NEED.easy - haveBy.easy.length;
+      const needMed = NEED.medium - haveBy.medium.length;
+      const needJoker = NEED.joker - haveBy.joker.length;
+      const jokerFromJoker = Math.min(needJoker, byDiff.joker.length);
+      const jokerFromHard = needJoker - jokerFromJoker;
+      const needHard = NEED.hard - haveBy.hard.length + jokerFromHard;
+      const possible =
+        needEasy <= byDiff.easy.length &&
+        needMed <= byDiff.medium.length &&
+        needHard <= byDiff.hard.length;
       if (!possible) continue;
-      for (const d of DIFFS) {
+      for (const d of ['easy', 'medium', 'hard'] as const) {
         const extra = byDiff[d].splice(0, NEED[d] - haveBy[d].length);
         ids.push(...haveBy[d].map((q) => q.id), ...extra.map((q) => q.id));
       }
+      const extraJoker = [
+        ...byDiff.joker.splice(0, jokerFromJoker),
+        ...byDiff.hard.splice(0, jokerFromHard),
+      ];
+      ids.push(...haveBy.joker.map((q) => q.id), ...extraJoker.map((q) => q.id));
       if (ids.length === 10) {
         send('set.build', { seq: set.seq, questionIds: ids });
         built++;
@@ -316,10 +330,10 @@ export function QuestionsTab({ s, send, bulk }: { s: Snapshot; send: Send; bulk:
     if (!built) alert(t.autoFillNothing);
   };
   const coverage = [
-    [1, 120],
-    [2, 24],
-    [3, 15],
-    [null, 21],
+    [1, s1Rounds * s.settings.blitzCount],
+    [2, (s.settings.stage2Rounds ?? 3) * s.settings.gamblerCount],
+    [3, (s.settings.stage3Rounds ?? 1) * s.settings.climbCount],
+    [null, s.settings.reserveCount ?? 21],
   ] as const;
   return (
     <>
@@ -329,7 +343,14 @@ export function QuestionsTab({ s, send, bulk }: { s: Snapshot; send: Send; bulk:
           : t.bankReview}
       </div>
       <div className="coverage-grid">
-        {coverage.map(([st, required]) => {
+        {coverage.map(([st, rawRequired]) => {
+          const totalInPool = questions.filter(
+            (q) => q.stage === st && (st ? q.pool === 'main' : q.pool !== 'main'),
+          ).length;
+          const required =
+            questions.length <= 112 && totalInPool > 0
+              ? Math.min(rawRequired, totalInPool)
+              : rawRequired;
           const count = questions.filter(
             (q) => q.stage === st && !q.used && (st ? q.pool === 'main' : q.pool !== 'main'),
           ).length;
@@ -355,7 +376,7 @@ export function QuestionsTab({ s, send, bulk }: { s: Snapshot; send: Send; bulk:
       </div>
       <Section
         title={t.setBuilder}
-        badge={`${sets.filter((x) => x.ok).length}/12`}
+        badge={`${sets.filter((x) => x.ok).length}/${s1Rounds}`}
         actions={
           <>
             <button onClick={autoFill}>{t.autoFill}</button>

@@ -7,11 +7,15 @@ import { Bolt, Card, Check, Clock, Joker, ArrowUp, Spark, Trophy } from '../ui/i
 
 export const stageName = (n: number) => [t.blitz, t.gambler, t.climb][n - 1];
 
-export function Intro() {
+export function Intro({ s }: { s?: Snapshot }) {
+  const c = s?.settings;
+  const s1Total = c ? c.stage1Rounds * (c.stage1TeamsPerRound ?? 4) : 48;
+  const s2Total = c ? c.stage2Rounds * (c.stage2TeamsPerRound ?? 4) : 12;
+  const s3Total = c ? (c.stage3Rounds ?? 1) * (c.stage3TeamsPerRound ?? 3) : 3;
   const steps = [
-    { n: 48, label: t.teamsWord },
-    { n: 12, label: t.teamsWord },
-    { n: 3, label: t.teamsWord },
+    { n: s1Total, label: t.teamsWord },
+    { n: s2Total, label: t.teamsWord },
+    { n: s3Total, label: t.teamsWord },
     { n: 1, label: t.championWord },
   ];
   return (
@@ -22,10 +26,10 @@ export function Intro() {
         <i className="halo h2" />
       </div>
       <h1 className="intro-title">{t.title}</h1>
-      <p className="intro-tag">{t.tagline}</p>
+      <p className="intro-tag">{c ? t.tagline.replace(/^\d+/, String(s1Total)) : t.tagline}</p>
       <div className="funnel">
         {steps.map((step, i) => (
-          <React.Fragment key={step.n}>
+          <React.Fragment key={i}>
             <div className="funnel-step" style={{ animationDelay: `${0.5 + i * 0.35}s` }}>
               <b className="num">{step.n}</b>
               <small>{step.label}</small>
@@ -57,7 +61,7 @@ export function Intro() {
 export function BracketScene({ s }: { s: Snapshot }) {
   return (
     <section className="d-bracket">
-      <Bracket rounds={s.rounds} currentKey={s.roundKey} />
+      <Bracket rounds={s.rounds} settings={s.settings} currentKey={s.roundKey} />
     </section>
   );
 }

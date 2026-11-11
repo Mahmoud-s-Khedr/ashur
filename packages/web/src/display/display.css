@@ -2335,3 +2335,248 @@ html.display-page.display-light body,
   background: rgba(255, 255, 255, 0.9);
   border-color: var(--border-hi);
 }
+
+/* ===== Audience Prizes Segment (.d-prize) ===== */
+.d-prize {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  align-items: center;
+  justify-items: center;
+  padding: 1.5rem 3rem 2.5rem;
+  gap: 1.8rem;
+  overflow: hidden;
+  --accent: var(--gold);
+}
+.prize-top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  animation: slide-up 0.6s var(--ease) both;
+}
+.prize-steps {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+.prize-step {
+  width: 3.1rem;
+  height: 3.1rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.35rem;
+  font-weight: 900;
+  background: var(--panel);
+  border: 2px solid var(--border-hi);
+  color: var(--muted);
+  transition: all 0.4s var(--spring);
+}
+.prize-step.done {
+  background: linear-gradient(135deg, var(--gold), #ff9d2e);
+  border-color: transparent;
+  color: #0b0f1f;
+  box-shadow: 0 0 22px rgba(248, 188, 85, 0.45);
+  animation: pop-in 0.5s var(--spring) both;
+}
+.prize-step.done svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+.prize-step.now {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(248, 188, 85, 0.14);
+  box-shadow:
+    0 0 0 4px rgba(248, 188, 85, 0.2),
+    0 0 28px rgba(248, 188, 85, 0.55);
+  transform: scale(1.14);
+}
+.prize-hero {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 1.2rem;
+  max-width: 68rem;
+}
+.prize-emblem {
+  position: relative;
+  width: 11.5rem;
+  height: 11.5rem;
+  display: grid;
+  place-items: center;
+  margin-bottom: 0.4rem;
+  animation:
+    prize-fly-in 1s cubic-bezier(0.2, 1.25, 0.35, 1) both,
+    prize-float 3.4s 1s ease-in-out infinite;
+}
+.emblem-core {
+  width: 8.6rem;
+  height: 8.6rem;
+  border-radius: 2.3rem;
+  background: linear-gradient(135deg, #ffe082, var(--gold) 55%, #ff8a3c);
+  color: #101528;
+  display: grid;
+  place-items: center;
+  box-shadow:
+    0 20px 55px rgba(248, 188, 85, 0.45),
+    inset 0 2px 6px rgba(255, 255, 255, 0.65);
+}
+.emblem-core svg {
+  width: 4.6rem;
+  height: 4.6rem;
+}
+.emblem-crown {
+  position: absolute;
+  top: -1.6rem;
+  color: var(--gold);
+  filter: drop-shadow(0 6px 16px rgba(248, 188, 85, 0.6));
+  animation: pop-in 0.7s 0.45s var(--spring) both;
+}
+.emblem-crown svg {
+  width: 3.2rem;
+  height: 3.2rem;
+}
+.prize-title {
+  margin: 0;
+  font-size: 5.4rem;
+  line-height: 1.1;
+  font-weight: 900;
+  background: linear-gradient(110deg, var(--gold) 15%, #ffffff 48%, var(--teal) 80%);
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation:
+    slide-up 0.8s 0.25s var(--ease) both,
+    shine 7s linear infinite;
+}
+.display-root.light .prize-title {
+  background: linear-gradient(110deg, var(--gold) 15%, var(--text) 50%, var(--teal) 85%);
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.prize-sub {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--muted);
+  animation: slide-up 0.85s 0.42s var(--ease) both;
+}
+.prize-q-block {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 74rem);
+  animation: prize-card-in 0.65s var(--spring) both;
+}
+.prize-flyers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+.prize-flyers .flyer {
+  position: absolute;
+  bottom: -4rem;
+  color: var(--gold);
+  opacity: 0;
+  filter: drop-shadow(0 0 16px rgba(248, 188, 85, 0.55));
+  animation: flyer-rise 6.5s ease-in-out infinite;
+}
+.prize-flyers .flyer svg {
+  width: 2.6rem;
+  height: 2.6rem;
+}
+.prize-flyers .f1 {
+  inset-inline-start: 8%;
+  animation-delay: 0s;
+}
+.prize-flyers .f2 {
+  inset-inline-start: 20%;
+  animation-delay: 1.1s;
+  color: var(--teal);
+}
+.prize-flyers .f3 {
+  inset-inline-start: 34%;
+  animation-delay: 2.3s;
+}
+.prize-flyers .f4 {
+  inset-inline-start: 48%;
+  animation-delay: 0.6s;
+  color: var(--pink);
+}
+.prize-flyers .f5 {
+  inset-inline-start: 62%;
+  animation-delay: 1.8s;
+}
+.prize-flyers .f6 {
+  inset-inline-start: 75%;
+  animation-delay: 2.9s;
+  color: var(--violet);
+}
+.prize-flyers .f7 {
+  inset-inline-start: 86%;
+  animation-delay: 0.4s;
+}
+.prize-flyers .f8 {
+  inset-inline-start: 93%;
+  animation-delay: 1.5s;
+  color: var(--teal);
+}
+@keyframes prize-fly-in {
+  0% {
+    opacity: 0;
+    transform: translateY(6rem) scale(0.35) rotate(-14deg);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-0.6rem) scale(1.06) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+@keyframes prize-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-0.75rem) rotate(2deg);
+  }
+}
+@keyframes prize-card-in {
+  0% {
+    opacity: 0;
+    transform: translateY(2.8rem) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes flyer-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0) translateX(0) scale(0.5) rotate(-20deg);
+  }
+  20% {
+    opacity: 0.75;
+  }
+  80% {
+    opacity: 0.65;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-92vh) translateX(2.2rem) scale(1.18) rotate(25deg);
+  }
+}

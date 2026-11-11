@@ -40,6 +40,7 @@ export type RoundView = {
   seq: number;
   teamIds: number[];
   winner?: number;
+  winners?: number[];
   completed?: boolean;
   teams: PublicTeam[];
 };
@@ -64,6 +65,7 @@ export type Snapshot = {
   index: number;
   settings: Settings;
   winner?: number;
+  winners?: number[];
   tieIds: number[];
   ready: number[];
   team: PublicTeam | null;

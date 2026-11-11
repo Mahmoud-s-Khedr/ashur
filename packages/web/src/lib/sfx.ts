@@ -90,7 +90,13 @@ class Sfx {
   }
 
   play(name: SfxName, arg = 0) {
-    if (!this.enabled || this.muted || !this.ctx) return;
+    if (
+      !this.enabled ||
+      this.muted ||
+      !this.ctx ||
+      (typeof location !== 'undefined' && location.pathname === '/play')
+    )
+      return;
     switch (name) {
       case 'tick':
         this.tone(1400, 0, 0.04, 'square', 0.06);

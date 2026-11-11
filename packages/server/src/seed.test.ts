@@ -32,7 +32,7 @@ describe('workbook question bank', () => {
       const db = openDb(path);
       try {
         const bank = new Engine(db).questions();
-        expect(bank).toHaveLength(180);
+        expect(bank).toHaveLength(112);
         expect(bank[0].body).toBe(questions[0].body);
         expect(bank.some((q) => q.body.includes('تجريبي'))).toBe(false);
       } finally {
@@ -42,41 +42,46 @@ describe('workbook question bank', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
-  it('uses all 112 source questions and preserves their answers in every slot', () => {
+  it('uses all 112 source questions without duplicates and preserves their answers in every slot', () => {
     expect(source).toHaveLength(112);
-    expect(questions).toHaveLength(180);
+    expect(questions).toHaveLength(112);
+    expect(new Set(questions.map((q) => q.body)).size).toBe(112);
     expect(new Set(questions.map((q) => q.body))).toEqual(new Set(source.map((q) => q.body)));
     expect(new Set(questions.map((q) => q.category)).size).toBe(7);
-    expect(questions.map((q) => q.id)).toEqual(Array.from({ length: 180 }, (_, i) => i + 1));
+    expect(questions.map((q) => q.id)).toEqual(Array.from({ length: 112 }, (_, i) => i + 1));
     for (const raw of questions) {
       const q = questionSchema.parse(raw);
       const original = source.find((s) => s.body === q.body)!;
       expect(q.category).toBe(original.category);
-      expect(q.difficulty).toBe(q.difficulty === 'joker' ? 'joker' : original.difficulty);
+      if (q.difficulty === 'joker') {
+        expect(original.difficulty).toBe('hard');
+      } else {
+        expect(q.difficulty).toBe(original.difficulty);
+      }
       if (q.type === 'mcq') {
         expect(q.options).toHaveLength(4);
         expect(new Set(q.options).size).toBe(4);
         expect(q.options[q.correct as number]).toBe(original.answer);
-      } else expect(q.correct).toEqual([original.answer]);
+      } else expect(q.correct).toContain(original.answer);
     }
     expect(new Set(questions.filter((q) => q.type === 'mcq').map((q) => q.correct))).toEqual(
       new Set([0, 1, 2, 3]),
     );
   });
 
-  it('provides complete rounds and usable harder reserves', () => {
-    expect(questions.filter((q) => q.stage === 2)).toHaveLength(24);
-    expect(questions.filter((q) => q.stage === 3)).toHaveLength(15);
+  it('provides complete rounds with joker always drawn from hard questions', () => {
+    expect(questions.filter((q) => q.stage === 2)).toHaveLength(18);
+    expect(questions.filter((q) => q.stage === 3)).toHaveLength(9);
     expect(
       questions
         .filter((q) => q.stage === 2 || q.stage === 3)
         .every((q) => q.type === 'text' && q.options.length === 0),
     ).toBe(true);
-    expect(questions.filter((q) => q.pool === 'tiebreaker')).toHaveLength(10);
+    expect(questions.filter((q) => q.pool === 'tiebreaker')).toHaveLength(2);
     const reserves = questions.filter((q) => q.pool === 'reserve');
-    expect(reserves).toHaveLength(11);
+    expect(reserves).toHaveLength(3);
     expect(reserves.every((q) => q.type === 'mcq' && q.difficulty === 'hard')).toBe(true);
-    for (let seq = 1; seq <= 12; seq++) {
+    for (let seq = 1; seq <= 8; seq++) {
       const set = questions.filter((q) => q.stage === 1 && q.setNo === seq);
       expect(set).toHaveLength(10);
       expect(new Set(set.map((q) => q.body)).size).toBe(10);
@@ -119,7 +124,7 @@ describe('workbook question bank', () => {
     try {
       seed(db);
       const engine = new Engine(db);
-      expect(engine.questions()).toHaveLength(180);
+      expect(engine.questions()).toHaveLength(112);
       expect(engine.questions().some((q) => q.body.includes('سؤال تجريبي'))).toBe(false);
       engine.dispatch(
         'settings.update',
@@ -137,13 +142,17 @@ describe('workbook question bank', () => {
             'answer.submit',
             {
               roundQuestionId: q.id,
-              answer: teamId === 1 ? q.correct : ((q.correct as number) + 1) % 4,
+              answer:
+                teamId === 1 || (teamId === 2 && id === engine.state.set[0])
+                  ? q.correct
+                  : ((q.correct as number) + 1) % 4,
             },
             { role: 'team', deviceId: `t-${teamId}`, teamId },
           );
       }
       expect(engine.state.phase).toBe('RESULTS');
       expect(engine.state.winner).toBe(1);
+      expect(engine.state.winners).toEqual([1, 2]);
       const first = JSON.parse(
         (db.prepare('SELECT json FROM questions WHERE id=1').get() as { json: string }).json,
       ) as Question;
@@ -152,7 +161,7 @@ describe('workbook question bank', () => {
       );
       seed(db);
       expect(new Engine(db).question(1)?.body).toBe('محتوى معدل');
-      expect(db.prepare('SELECT COUNT(*) n FROM questions').get()).toEqual({ n: 180 });
+      expect(db.prepare('SELECT COUNT(*) n FROM questions').get()).toEqual({ n: 112 });
     } finally {
       db.close();
     }

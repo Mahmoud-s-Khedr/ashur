@@ -164,6 +164,7 @@ export function Race({
 
 export function Standings({ s, fx }: { s: Snapshot; fx: Record<number, TeamFx> }) {
   const order = byScore(s.lineup);
+  const winnerIds = s.winners?.length ? s.winners : s.winner ? [s.winner] : [];
   return (
     <div className={`standings s${s.stage}`}>
       <div className="st-head">
@@ -177,7 +178,7 @@ export function Standings({ s, fx }: { s: Snapshot; fx: Record<number, TeamFx> }
       {order.map((team, i) => (
         <div
           key={team.id}
-          className={`st-row ${team.id === s.winner ? 'winner' : ''}`}
+          className={`st-row ${winnerIds.includes(team.id) ? 'winner' : ''}`}
           style={cssVars({ '--team': team.color, animationDelay: `${0.9 + i * 0.25}s` })}
         >
           <b className="num rank">{i + 1}</b>
@@ -203,7 +204,11 @@ export function Standings({ s, fx }: { s: Snapshot; fx: Record<number, TeamFx> }
 }
 
 export function RoundResults({ s, fx }: { s: Snapshot; fx: Record<number, TeamFx> }) {
-  const winner = s.lineup.find((x) => x.id === s.winner);
+  const winnerIds = s.winners?.length ? s.winners : s.winner ? [s.winner] : [];
+  const winners = winnerIds
+    .map((id) => s.lineup.find((x) => x.id === id))
+    .filter((x): x is LineupTeam => !!x);
+  const winner = winners[0];
   return (
     <section className="d-results">
       <Confetti />
@@ -214,9 +219,17 @@ export function RoundResults({ s, fx }: { s: Snapshot; fx: Record<number, TeamFx
         <div className="crown-wrap">
           <Crown />
         </div>
-        {winner && <TeamMark team={winner} size={150} className="winner-mark" />}
-        <p className="eyebrow">{t.winner}</p>
-        <h1 className="winner-name">{winner?.name}</h1>
+        {winners.length > 1 ? (
+          <div style={{ display: 'flex', gap: '1.2rem', justifyContent: 'center', alignItems: 'center' }}>
+            {winners.map((w) => (
+              <TeamMark key={w.id} team={w} size={115} className="winner-mark" />
+            ))}
+          </div>
+        ) : (
+          winner && <TeamMark team={winner} size={150} className="winner-mark" />
+        )}
+        <p className="eyebrow">{winners.length > 1 ? t.qualifiers : t.winner}</p>
+        <h1 className="winner-name">{winners.map((w) => w.name).join(' · ')}</h1>
         <p className="advance">
           <Check /> {s.stage === 1 ? t.advancesToGambler : t.advancesToFinal}
         </p>
@@ -241,8 +254,13 @@ export function Leaderboard({
   const live =
     s.stage !== 1 || s.settings.liveScores || !['COUNTDOWN', 'RUNNING'].includes(s.phase);
   const qualified = s.rounds
-    .filter((r) => r.completed && r.winner)
-    .map((r) => ({ round: r, team: r.teams.find((x) => x.id === r.winner)! }))
+    .filter((r) => r.completed && (r.winners?.length || r.winner))
+    .flatMap((r) =>
+      (r.winners?.length ? r.winners : r.winner ? [r.winner] : []).map((id) => ({
+        round: r,
+        team: r.teams.find((x) => x.id === id)!,
+      })),
+    )
     .filter((x) => x.team);
   return (
     <section className="d-leaderboard">
@@ -265,7 +283,11 @@ export function Leaderboard({
         <div className="q-list">
           {qualified.length === 0 && <p className="muted">{t.noQualifiersYet}</p>}
           {qualified.map(({ round, team }) => (
-            <div key={round.key} className="q-item" style={cssVars({ '--team': team.color })}>
+            <div
+              key={`${round.key}-${team.id}`}
+              className="q-item"
+              style={cssVars({ '--team': team.color })}
+            >
               <TeamMark team={team} size={34} />
               <span>{team.name}</span>
               <small className="num">

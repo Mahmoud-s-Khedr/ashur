@@ -37,6 +37,11 @@ export const DEFAULTS = {
   teamCount: 48,
   stage1Rounds: 12,
   stage2Rounds: 3,
+  stage3Rounds: 1,
+  stage1TeamsPerRound: 4,
+  stage1QualifiersPerRound: 1,
+  stage2TeamsPerRound: 4,
+  stage3TeamsPerRound: 3,
   reserveCount: 21,
 };
 export type Settings = typeof DEFAULTS;

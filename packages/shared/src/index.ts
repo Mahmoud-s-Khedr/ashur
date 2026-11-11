@@ -86,6 +86,7 @@ export type Round = {
   seq: number;
   teamIds: number[];
   winner?: number;
+  winners?: number[];
   completed?: boolean;
   audience?: {
     questionId?: number;
@@ -117,6 +118,7 @@ export type Match = {
   autoAction: string;
   spinAt: number;
   winner?: number;
+  winners?: number[];
   tieIds: number[];
   tieQuestion?: number;
   finishMs: Record<number, number>;

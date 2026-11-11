@@ -67,10 +67,11 @@ async function printResults() {
         .filter((x: any) => x.round_key === r.key)
         .map((x: any) => ({ ...x, score: x.score + base }))
         .sort((a: any, b: any) => b.score - a.score);
+      const winnerIds: number[] = r.winners?.length ? r.winners : r.winner ? [r.winner] : [];
       return `<h2>${esc(label(r))}</h2><table><thead><tr><th>${esc(t.rankWord)}</th><th>${esc(t.team)}</th><th>${esc(t.score)}</th><th></th></tr></thead><tbody>${rows
         .map(
           (x: any, i: number) =>
-            `<tr class="${x.team_id === r.winner ? 'win' : ''}"><td>${i + 1}</td><td>${esc(teamName(x.team_id))}</td><td>${x.score}</td><td>${x.team_id === r.winner ? esc(t.winnerMark) : ''}</td></tr>`,
+            `<tr class="${winnerIds.includes(x.team_id) ? 'win' : ''}"><td>${i + 1}</td><td>${esc(teamName(x.team_id))}</td><td>${x.score}</td><td>${winnerIds.includes(x.team_id) ? esc(t.winnerMark) : ''}</td></tr>`,
         )
         .join('')}</tbody></table>`;
     })

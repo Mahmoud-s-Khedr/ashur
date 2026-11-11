@@ -29,7 +29,7 @@ const schema: Record<string, z.ZodTypeAny> = {
     answer: z.string().trim().min(1).max(4000).optional(),
   }),
   'stage.jump': z.object({ stage: z.number().int().min(1).max(3) }),
-  'round.assignTeams': z.object({ teamIds: z.array(z.number().int()).min(3).max(4) }),
+  'round.assignTeams': z.object({ teamIds: z.array(z.number().int()).min(1).max(20) }),
   'answer.submit': z.object({
     roundQuestionId: z.number().int(),
     answer: z.union([z.number().int().nonnegative(), z.string().max(2000)]),
@@ -70,9 +70,9 @@ const schema: Record<string, z.ZodTypeAny> = {
   }),
   'bracket.bulk': z.object({
     assignments: z
-      .array(z.object({ key: z.string(), teamIds: z.array(z.number().int()).min(3).max(4) }))
+      .array(z.object({ key: z.string(), teamIds: z.array(z.number().int()).min(1).max(20) }))
       .min(1)
-      .max(20),
+      .max(100),
   }),
   'teams.delete': z.object({ id: z.number().int() }),
   'question.cancelLeak': z.object({
@@ -82,10 +82,10 @@ const schema: Record<string, z.ZodTypeAny> = {
   'tiebreak.launch': z.object({ questionId: z.number().int().optional() }),
   'bracket.override': z.object({
     key: z.string(),
-    teamIds: z.array(z.number().int()).min(3).max(4),
+    teamIds: z.array(z.number().int()).min(1).max(20),
   }),
   'set.build': z.object({
-    seq: z.number().int().min(1).max(12),
+    seq: z.number().int().min(1).max(100),
     questionIds: z.array(z.number().int()).length(10),
   }),
 };
@@ -133,18 +133,41 @@ export class Engine {
     private clock = () => performance.now(),
   ) {
     const saved = db.prepare('SELECT json FROM match_state WHERE id=1').get() as
-      { json: string } | undefined;
+      | { json: string }
+      | undefined;
+    const dbTeamCount = (db.prepare('SELECT COUNT(*) AS n FROM teams').get() as { n: number }).n;
+    const initSettings =
+      dbTeamCount === 32
+        ? {
+            ...structuredClone(DEFAULTS),
+            teamCount: 32,
+            stage1Rounds: 8,
+            stage1TeamsPerRound: 4,
+            stage1QualifiersPerRound: 2,
+            stage2Rounds: 4,
+            stage2TeamsPerRound: 4,
+            stage3Rounds: 1,
+            stage3TeamsPerRound: 4,
+            stage2Mapping: [
+              [1, 2],
+              [3, 4],
+              [5, 6],
+              [7, 8],
+            ],
+          }
+        : structuredClone(DEFAULTS);
     const rounds = [];
-    for (let i = 1; i <= DEFAULTS.stage1Rounds; i++)
+    for (let i = 1; i <= initSettings.stage1Rounds; i++)
       rounds.push({
         key: `1-${i}`,
         stage: 1,
         seq: i,
         teamIds: [4 * i - 3, 4 * i - 2, 4 * i - 1, 4 * i],
       });
-    for (let i = 1; i <= DEFAULTS.stage2Rounds; i++)
+    for (let i = 1; i <= initSettings.stage2Rounds; i++)
       rounds.push({ key: `2-${i}`, stage: 2, seq: i, teamIds: [] });
-    rounds.push({ key: '3-1', stage: 3, seq: 1, teamIds: [] });
+    for (let i = 1; i <= initSettings.stage3Rounds; i++)
+      rounds.push({ key: `3-${i}`, stage: 3, seq: i, teamIds: [] });
     this.state = saved
       ? JSON.parse(saved.json)
       : {
@@ -171,7 +194,7 @@ export class Engine {
           spinAt: 0,
           tieIds: [],
           finishMs: {},
-          settings: structuredClone(DEFAULTS),
+          settings: initSettings,
           rounds,
           rulesShownStages: [],
         };
@@ -182,6 +205,11 @@ export class Engine {
       this.state.rulesShownStages.push(this.round.stage);
     this.state.spinAt ??= 0;
     this.state.settings.liveScores ??= true;
+    this.state.settings.stage3Rounds ??= DEFAULTS.stage3Rounds;
+    this.state.settings.stage1TeamsPerRound ??= DEFAULTS.stage1TeamsPerRound;
+    this.state.settings.stage1QualifiersPerRound ??= DEFAULTS.stage1QualifiersPerRound;
+    this.state.settings.stage2TeamsPerRound ??= DEFAULTS.stage2TeamsPerRound;
+    this.state.settings.stage3TeamsPerRound ??= DEFAULTS.stage3TeamsPerRound;
     this.state.allottedMs ??= this.state.elapsedMs + this.state.remainingMs;
     this.origin = this.clock();
     this.originElapsed = this.state.elapsedMs;
@@ -195,7 +223,115 @@ export class Engine {
     }
   }
   get round() {
-    return this.state.rounds.find((r) => r.key === this.state.roundKey)!;
+    return this.state.rounds.find((r) => r.key === this.state.roundKey) ?? this.state.rounds[0];
+  }
+  private teamsPerRound(stage: number, settings = this.state.settings): number {
+    return stage === 1
+      ? (settings.stage1TeamsPerRound ?? 4)
+      : stage === 2
+        ? (settings.stage2TeamsPerRound ?? 4)
+        : (settings.stage3TeamsPerRound ?? 3);
+  }
+  private roundsInStage(stage: number, settings = this.state.settings): number {
+    return stage === 1
+      ? settings.stage1Rounds
+      : stage === 2
+        ? settings.stage2Rounds
+        : (settings.stage3Rounds ?? 1);
+  }
+  private qualifiersForStage(stage: number, settings = this.state.settings): number {
+    return stage === 1
+      ? Math.max(
+          1,
+          Math.min(this.teamsPerRound(1, settings) - 1, settings.stage1QualifiersPerRound ?? 1),
+        )
+      : 1;
+  }
+  private buildDefaultMapping(
+    s1Rounds: number,
+    s2Rounds: number,
+    s2Teams: number,
+    s1Qualifiers = 1,
+  ): number[][] {
+    const groups: number[][] = Array.from({ length: s2Rounds }, () => []);
+    const roundsPerGroup = Math.max(1, Math.ceil(s2Teams / Math.max(1, s1Qualifiers)));
+    let r = 1;
+    for (let g = 0; g < s2Rounds; g++) {
+      for (let k = 0; k < roundsPerGroup && r <= s1Rounds; k++, r++) {
+        groups[g].push(r);
+      }
+    }
+    return groups;
+  }
+  private ensureTeamPool(needed: number) {
+    const existing = this.teams();
+    if (existing.length >= needed) return existing;
+    const usedCodes = new Set(existing.map((t) => t.code));
+    const colors = ['#27d6b0', '#f8bc55', '#8f91ff', '#ff7d9f', '#4aa8ff', '#3ddc84'];
+    const insert = this.db.prepare('INSERT INTO teams(code,name,color) VALUES(?,?,?)');
+    let nextCode = 111;
+    for (let i = existing.length + 1; i <= needed; i++) {
+      while (usedCodes.has(String(nextCode))) nextCode++;
+      const code = String(nextCode++);
+      usedCodes.add(code);
+      insert.run(code, `الفريق ${i}`, colors[(i - 1) % colors.length]);
+    }
+    return this.teams();
+  }
+  private syncRoundsWithSettings(settings = this.state.settings) {
+    const s = this.state;
+    const s1Rounds = settings.stage1Rounds;
+    const s2Rounds = settings.stage2Rounds;
+    const s3Rounds = settings.stage3Rounds ?? 1;
+    const s1Teams = settings.stage1TeamsPerRound ?? 4;
+    const allIds = this.ensureTeamPool(s1Rounds * s1Teams).map((t) => t.id);
+    const nextRounds: Match['rounds'] = [];
+    for (let i = 1; i <= s1Rounds; i++) {
+      const key = `1-${i}`;
+      const prev = s.rounds.find((r) => r.key === key);
+      nextRounds.push(
+        prev && (prev.completed || prev.teamIds.length === s1Teams)
+          ? prev
+          : {
+              ...(prev ?? { key, stage: 1, seq: i }),
+              teamIds: allIds.slice((i - 1) * s1Teams, i * s1Teams),
+            },
+      );
+    }
+    for (let i = 1; i <= s2Rounds; i++) {
+      const key = `2-${i}`;
+      const prev = s.rounds.find((r) => r.key === key);
+      const mapped = (settings.stage2Mapping[i - 1] ?? [])
+        .flatMap((seq) => {
+          const s1 = nextRounds.find((r) => r.key === `1-${seq}`);
+          return s1?.winners?.length ? s1.winners : s1?.winner ? [s1.winner] : [];
+        })
+        .filter((id): id is number => !!id)
+        .slice(0, settings.stage2TeamsPerRound ?? 4);
+      nextRounds.push(
+        prev
+          ? { ...prev, teamIds: prev.completed ? prev.teamIds : mapped.length ? mapped : prev.teamIds.slice(0, settings.stage2TeamsPerRound ?? 4) }
+          : { key, stage: 2, seq: i, teamIds: mapped },
+      );
+    }
+    const s2Winners = nextRounds
+      .filter((r) => r.stage === 2 && r.winner)
+      .map((r) => r.winner!);
+    const s3Teams = settings.stage3TeamsPerRound ?? 3;
+    for (let i = 1; i <= s3Rounds; i++) {
+      const key = `3-${i}`;
+      const prev = s.rounds.find((r) => r.key === key);
+      const assigned = s2Winners.slice((i - 1) * s3Teams, i * s3Teams);
+      nextRounds.push(
+        prev
+          ? { ...prev, teamIds: prev.completed ? prev.teamIds : assigned.length ? assigned : prev.teamIds.slice(0, s3Teams) }
+          : { key, stage: 3, seq: i, teamIds: assigned },
+      );
+    }
+    s.rounds = nextRounds;
+    if (!s.rounds.some((r) => r.key === s.roundKey)) {
+      s.roundKey = s.rounds[0]?.key ?? '1-1';
+    }
   }
   teams() {
     return this.db
@@ -442,9 +578,21 @@ export class Engine {
         (q.stage === 3 && stage3Incomplete));
 
     const unchosen = all.filter((q) => !takenIds.has(q.id));
-    this.require(unchosen.length, 'No unused questions left in bank');
-    const unlocked = unchosen.filter((q) => !lockedMain(q));
-    const base = unlocked.length ? unlocked : unchosen;
+    const fallbackUnchosen = unchosen.length
+      ? unchosen
+      : all.filter(
+          (q) =>
+            !extraIds.has(q.id) &&
+            !s.set.includes(q.id) &&
+            q.id !== s.tieQuestion &&
+            !takenBodies.has(q.body),
+        );
+    const candidates = fallbackUnchosen.length
+      ? fallbackUnchosen
+      : all.filter((q) => !s.set.includes(q.id) && q.id !== s.tieQuestion);
+    this.require(candidates.length, 'No unused questions left in bank');
+    const unlocked = candidates.filter((q) => !lockedMain(q));
+    const base = unlocked.length ? unlocked : candidates;
     const uniqueBody = base.filter((q) => !takenBodies.has(q.body));
     const pool0 = uniqueBody.length ? uniqueBody : base;
     const nonTie = pool0.filter((q) => q.pool !== 'tiebreaker');
@@ -477,6 +625,24 @@ export class Engine {
       roundKey: this.state.roundKey,
     });
   }
+  private stage2Pool(): Question[] {
+    const s = this.state;
+    const all = this.questions();
+    const primary = all.filter((q) => q.stage === 2 && q.pool === 'main' && !q.used);
+    if (primary.length) return primary;
+    const uncompletedStage1 = new Set(
+      s.rounds.filter((r) => r.stage === 1 && !r.completed).map((r) => r.seq),
+    );
+    const unlockedUnused = all.filter(
+      (q) =>
+        !q.used &&
+        !(q.stage === 1 && q.setNo !== null && uncompletedStage1.has(q.setNo)),
+    );
+    if (unlockedUnused.length) return unlockedUnused;
+    const unused = all.filter((q) => !q.used);
+    if (unused.length) return unused;
+    return all.filter((q) => !s.set.includes(q.id));
+  }
   private buildSet() {
     const s = this.state,
       q = this.questions();
@@ -487,6 +653,20 @@ export class Engine {
         .map((q) => q.id);
       this.require(s.set.length === s.settings.blitzCount, 'Blitz set needs ten unused questions');
       const set = s.set.map((id) => this.question(id)!);
+      if (
+        set.filter((x) => x.difficulty === 'easy').length === 3 &&
+        set.filter((x) => x.difficulty === 'medium').length === 3 &&
+        set.filter((x) => x.difficulty === 'hard').length === 4 &&
+        set.filter((x) => x.difficulty === 'joker').length === 0
+      ) {
+        const promoted = set.filter((x) => x.difficulty === 'hard').at(-1)!;
+        promoted.difficulty = 'joker';
+        const { used: _u, deleted: _d, ...raw } = promoted;
+        this.db
+          .prepare('UPDATE questions SET json=? WHERE id=?')
+          .run(JSON.stringify(raw), promoted.id);
+        this.bank = null;
+      }
       this.require(
         set.filter((q) => q.difficulty === 'easy').length === 3 &&
           set.filter((q) => q.difficulty === 'medium').length === 3 &&
@@ -499,17 +679,40 @@ export class Engine {
       ordered.splice(s.settings.jokerPosition - 1, 0, joker);
       s.set = ordered.map((q) => q.id);
     } else if (this.round.stage === 3) {
-      s.set = q
-        .filter((q) => q.stage === 3 && q.pool === 'main' && !q.used)
-        .slice(0, s.settings.climbCount)
-        .map((q) => q.id);
+      const primary = q.filter((q) => q.stage === 3 && q.pool === 'main' && !q.used);
+      const chosen: Question[] = [...primary.slice(0, s.settings.climbCount)];
+      if (chosen.length < s.settings.climbCount) {
+        const chosenIds = new Set(chosen.map((x) => x.id));
+        const uncompletedStage1 = new Set(
+          s.rounds.filter((r) => r.stage === 1 && !r.completed).map((r) => r.seq),
+        );
+        const extraUnused = q.filter(
+          (x) =>
+            !chosenIds.has(x.id) &&
+            !x.used &&
+            !(x.stage === 1 && x.setNo !== null && uncompletedStage1.has(x.setNo)),
+        );
+        for (const item of extraUnused) {
+          if (chosen.length >= s.settings.climbCount) break;
+          chosen.push(item);
+          chosenIds.add(item.id);
+        }
+        if (chosen.length < s.settings.climbCount) {
+          for (const item of q.filter((x) => !chosenIds.has(x.id))) {
+            if (chosen.length >= s.settings.climbCount) break;
+            chosen.push(item);
+            chosenIds.add(item.id);
+          }
+        }
+      }
+      s.set = chosen.map((item) => this.ensureWrittenQuestion(item).id);
       this.require(s.set.length === s.settings.climbCount, 'Final needs fifteen unused questions');
     }
   }
   private begin() {
     const s = this.state;
     this.require(
-      this.round.teamIds.length === (this.round.stage === 3 ? 3 : 4),
+      this.round.teamIds.length === this.teamsPerRound(this.round.stage),
       'Incomplete lineup',
     );
     this.buildSet();
@@ -580,22 +783,49 @@ export class Engine {
     if (!s.answers.some((a) => a.questionId === qId && a.verdict === 'pending'))
       this.schedule('question.reveal');
   }
-  private resolveRanking(explicit?: number) {
+  private resolveRanking(explicit?: number | number[]) {
     const s = this.state;
     const scores = this.scores();
-    const sorted = [...this.round.teamIds].sort((a, b) => scores[b] - scores[a]);
-    const tied = sorted.filter((id) => scores[id] === scores[sorted[0]]);
-    if (!explicit && tied.length > 1) {
-      s.tieIds = tied;
+    const k = Math.min(
+      this.round.teamIds.length,
+      this.qualifiersForStage(this.round.stage),
+    );
+    const sorted = [...this.round.teamIds].sort(
+      (a, b) =>
+        scores[b] - scores[a] ||
+        (s.finishMs[a] ?? Number.POSITIVE_INFINITY) -
+          (s.finishMs[b] ?? Number.POSITIVE_INFINITY),
+    );
+    const cutoffScore = scores[sorted[k - 1]];
+    const guaranteed = sorted.filter((id) => scores[id] > cutoffScore);
+    const atCutoff = sorted.filter((id) => scores[id] === cutoffScore);
+    const spotsLeft = k - guaranteed.length;
+    if (!explicit && atCutoff.length > spotsLeft) {
+      s.tieIds = atCutoff;
       s.phase = 'REVIEW';
       s.winner = undefined;
+      s.winners = undefined;
       return;
     }
-    const winner = explicit ?? sorted[0];
+    const explicitList =
+      explicit === undefined ? [] : Array.isArray(explicit) ? explicit : [explicit];
+    const priority =
+      s.tieIds.length > 0
+        ? [...guaranteed, ...explicitList, ...atCutoff, ...sorted]
+        : [...explicitList, ...guaranteed, ...atCutoff, ...sorted];
+    const winners: number[] = [];
+    for (const id of priority) {
+      if (id && !winners.includes(id) && winners.length < k) {
+        winners.push(id);
+      }
+    }
+    const winner = winners[0];
     this.require(winner, 'No winner');
     s.winner = winner;
+    s.winners = winners;
     s.phase = 'RESULTS';
     this.round.winner = winner;
+    this.round.winners = winners;
     this.round.completed = true;
     s.tieQuestion = undefined;
     s.tieIds = [];
@@ -603,7 +833,7 @@ export class Engine {
       this.db
         .prepare('UPDATE teams SET status=? WHERE id=?')
         .run(
-          id === winner
+          winners.includes(id)
             ? this.round.stage === 3
               ? 'champion'
               : this.round.stage === 2
@@ -613,18 +843,32 @@ export class Engine {
           id,
         );
     if (this.round.stage === 1) {
+      const s2Teams = this.teamsPerRound(2);
       for (let i = 0; i < s.settings.stage2Mapping.length; i++) {
-        const r = s.rounds.find((r) => r.key === `2-${i + 1}`)!;
+        const r = s.rounds.find((r) => r.key === `2-${i + 1}`);
+        if (!r || r.completed) continue;
         r.teamIds = s.settings.stage2Mapping[i]
-          .map((seq) => s.rounds.find((r) => r.key === `1-${seq}`)?.winner)
-          .filter((id): id is number => !!id);
+          .flatMap((seq) => {
+            const s1 = s.rounds.find((r) => r.key === `1-${seq}`);
+            return s1?.winners?.length ? s1.winners : s1?.winner ? [s1.winner] : [];
+          })
+          .filter((id): id is number => !!id)
+          .slice(0, s2Teams);
       }
     }
-    if (this.round.stage === 2)
-      s.rounds.find((r) => r.key === '3-1')!.teamIds = s.rounds
+    if (this.round.stage === 2) {
+      const s2Winners = s.rounds
         .filter((r) => r.stage === 2)
         .map((r) => r.winner)
         .filter((id): id is number => !!id);
+      const s3Teams = this.teamsPerRound(3);
+      const s3Rounds = s.rounds.filter((r) => r.stage === 3);
+      s3Rounds.forEach((r, idx) => {
+        if (!r.completed) {
+          r.teamIds = s2Winners.slice(idx * s3Teams, (idx + 1) * s3Teams);
+        }
+      });
+    }
     if (!this.round.audience) this.assignAudienceQuestion();
   }
   private refreshRankingAfterAdjustment() {
@@ -713,7 +957,15 @@ export class Engine {
         const rows = this.db
           .prepare('SELECT seat_no FROM devices WHERE team_id IS NOT NULL AND id<>?')
           .all(actor.deviceId) as { seat_no: number }[];
-        const seat = [1, 2, 3, 4].find((n) => !rows.some((r) => r.seat_no === n));
+        const maxSeats = Math.max(
+          4,
+          this.teamsPerRound(1),
+          this.teamsPerRound(2),
+          this.teamsPerRound(3),
+          this.round.teamIds.length,
+        );
+        const seats = Array.from({ length: maxSeats }, (_, i) => i + 1);
+        const seat = seats.find((n) => !rows.some((r) => r.seat_no === n));
         this.require(seat || bound, 'All four seats are occupied');
         this.db
           .prepare('UPDATE devices SET team_id=?,seat_no=? WHERE id=?')
@@ -758,9 +1010,10 @@ export class Engine {
         );
         const target = s.rounds.find((r) => r.stage === p.stage && !r.completed);
         this.require(target, 'All rounds in this stage are complete');
-        const need = target.stage === 3 ? 3 : 4;
+        const need = this.teamsPerRound(target.stage);
         if (target.teamIds.length !== need) {
-          const allTeams = this.teams();
+          if (target.teamIds.length > need) target.teamIds = target.teamIds.slice(0, need);
+          const allTeams = this.ensureTeamPool(need * this.roundsInStage(target.stage));
           const taken = new Set(
             s.rounds
               .filter((r) => r.stage === target.stage && r !== target)
@@ -789,18 +1042,23 @@ export class Engine {
         break;
       }
       case 'competition.reset': {
-        const allIds = this.teams().map((t) => t.id);
+        const s1Rounds = s.settings.stage1Rounds;
+        const s2Rounds = s.settings.stage2Rounds;
+        const s3Rounds = s.settings.stage3Rounds ?? 1;
+        const s1Teams = this.teamsPerRound(1);
+        const allIds = this.ensureTeamPool(s1Rounds * s1Teams).map((t) => t.id);
         const rounds = [];
-        for (let i = 1; i <= DEFAULTS.stage1Rounds; i++)
+        for (let i = 1; i <= s1Rounds; i++)
           rounds.push({
             key: `1-${i}`,
             stage: 1,
             seq: i,
-            teamIds: allIds.slice((i - 1) * 4, i * 4),
+            teamIds: allIds.slice((i - 1) * s1Teams, i * s1Teams),
           });
-        for (let i = 1; i <= DEFAULTS.stage2Rounds; i++)
+        for (let i = 1; i <= s2Rounds; i++)
           rounds.push({ key: `2-${i}`, stage: 2, seq: i, teamIds: [] });
-        rounds.push({ key: '3-1', stage: 3, seq: 1, teamIds: [] });
+        for (let i = 1; i <= s3Rounds; i++)
+          rounds.push({ key: `3-${i}`, stage: 3, seq: i, teamIds: [] });
         this.db.prepare("UPDATE teams SET status='active'").run();
         this.db.prepare('UPDATE questions SET is_used=0').run();
         this.db.prepare('DELETE FROM score_events').run();
@@ -838,7 +1096,7 @@ export class Engine {
         const r = type === 'bracket.override' ? s.rounds.find((r) => r.key === p.key) : this.round;
         this.require(r && !r.completed, 'Round cannot be changed');
         this.require(
-          p.teamIds.length === (r.stage === 3 ? 3 : 4) &&
+          p.teamIds.length === this.teamsPerRound(r.stage) &&
             new Set(p.teamIds).size === p.teamIds.length &&
             p.teamIds.every((id: number) => this.teams().some((t) => t.id === id)),
           'Invalid lineup',
@@ -872,7 +1130,7 @@ export class Engine {
           const r = s.rounds.find((r) => r.key === a.key);
           this.require(r && !r.completed, 'Round cannot be changed');
           this.require(
-            a.teamIds.length === (r.stage === 3 ? 3 : 4) &&
+            a.teamIds.length === this.teamsPerRound(r.stage) &&
               new Set(a.teamIds).size === a.teamIds.length &&
               a.teamIds.every((id: number) => all.some((t) => t.id === id)),
             'Invalid lineup',
@@ -994,7 +1252,7 @@ export class Engine {
       }
       case 'wheel.spin': {
         this.phase('WHEEL');
-        const qs = this.questions().filter((q) => q.stage === 2 && q.pool === 'main' && !q.used);
+        const qs = this.stage2Pool();
         const cats = [...new Set(qs.map((q) => q.category))];
         this.require(cats.length, 'Stage 2 bank exhausted');
         s.category = cats[randomInt(cats.length)];
@@ -1027,11 +1285,10 @@ export class Engine {
           this.round.teamIds.every((id) => s.cards[id]),
           'Every team must pick a card',
         );
-        const qs = this.questions().filter(
-          (q) => q.stage === 2 && q.pool === 'main' && !q.used && q.category === s.category,
-        );
+        const qs = this.stage2Pool().filter((q) => q.category === s.category);
         this.require(qs.length, 'Category exhausted');
-        s.set[s.index] = qs[randomInt(qs.length)].id;
+        const picked = this.ensureWrittenQuestion(qs[randomInt(qs.length)]);
+        s.set[s.index] = picked.id;
         for (const id of this.round.teamIds) {
           s.cardUses[id] ??= {};
           s.cardUses[id][s.cards[id]] = (s.cardUses[id][s.cards[id]] ?? 0) + 1;
@@ -1041,7 +1298,7 @@ export class Engine {
       }
       case 'question.reroll': {
         this.phase('CARD_PICK');
-        const qs = this.questions().filter((q) => q.stage === 2 && q.pool === 'main' && !q.used);
+        const qs = this.stage2Pool();
         this.require(qs.length, 'Bank exhausted');
         s.category = qs[randomInt(qs.length)].category;
         s.cards = {};
@@ -1136,9 +1393,12 @@ export class Engine {
           'Grade all text answers before revealing',
         );
         if (s.tieQuestion) {
-          const winner = fastestCorrect(answers);
+          const correctBySpeed = answers
+            .filter((a) => a.verdict === 'correct')
+            .sort((a, b) => a.elapsedUs - b.elapsedUs)
+            .map((a) => a.teamId);
           s.tieQuestion = undefined;
-          if (winner) this.resolveRanking(winner);
+          if (correctBySpeed.length) this.resolveRanking(correctBySpeed);
           else {
             s.phase = 'TIE_READY';
             s.ready = [];
@@ -1202,10 +1462,34 @@ export class Engine {
           s.tieIds.every((id) => s.ready.includes(id)),
           'Tied teams are not ready',
         );
-        const qs = this.questions()
+        const all = this.questions();
+        const primary = all
           .filter((q) => q.pool !== 'main' && !q.used)
           .sort((a, b) => (a.pool === 'tiebreaker' ? -1 : 1) - (b.pool === 'tiebreaker' ? -1 : 1));
-        const picked = p.questionId ? qs.find((q) => q.id === p.questionId) : qs[0];
+        const uncompletedStage1 = new Set(
+          s.rounds.filter((r) => r.stage === 1 && !r.completed).map((r) => r.seq),
+        );
+        const fallbackUnused = all
+          .filter(
+            (q) =>
+              !q.used &&
+              !s.set.includes(q.id) &&
+              !(q.stage === 1 && q.setNo !== null && uncompletedStage1.has(q.setNo)),
+          )
+          .sort(
+            (a, b) =>
+              (a.difficulty === 'hard' || a.difficulty === 'joker' ? -1 : 1) -
+              (b.difficulty === 'hard' || b.difficulty === 'joker' ? -1 : 1),
+          );
+        const qs = primary.length
+          ? primary
+          : fallbackUnused.length
+            ? fallbackUnused
+            : all.filter((q) => !s.set.includes(q.id));
+        const picked = p.questionId
+          ? (all.find((q) => q.id === p.questionId && !q.used) ??
+            qs.find((q) => q.id === p.questionId))
+          : qs[0];
         this.require(picked, 'No unused tie-breaker question');
         const q = this.ensureWrittenQuestion(picked);
         s.tieQuestion = q.id;
@@ -1336,12 +1620,12 @@ export class Engine {
         current.status =
           type === 'prize.show' ? 'question' : type === 'prize.reveal' ? 'answer' : 'done';
         if (type === 'prize.show') s.scene = 'auto';
-        if (
-          type === 'prize.finish' &&
-          this.isPrizeWindow() &&
-          prizes.filter((q) => q.status === 'done').length < 5
-        ) {
-          this.assignPrizeQuestion();
+        if (type === 'prize.finish') {
+          if (this.isPrizeWindow() && prizes.filter((q) => q.status === 'done').length < 5) {
+            this.assignPrizeQuestion();
+          } else if (prizes.filter((q) => q.status === 'done').length >= 5) {
+            this.schedule('round.next');
+          }
         }
         break;
       }
@@ -1525,11 +1809,55 @@ export class Engine {
           merged.blitzCount === 10 &&
             merged.gamblerCount === 8 &&
             merged.climbCount === 15 &&
-            merged.teamCount === 48 &&
-            merged.stage1Rounds === 12 &&
-            merged.stage2Rounds === 3 &&
             merged.reserveCount === 21,
           'Tournament sizes are fixed',
+        );
+        this.require(
+          Number.isInteger(merged.stage1Rounds) &&
+            merged.stage1Rounds >= 1 &&
+            merged.stage1Rounds <= 50 &&
+            Number.isInteger(merged.stage2Rounds) &&
+            merged.stage2Rounds >= 1 &&
+            merged.stage2Rounds <= 50 &&
+            Number.isInteger(merged.stage3Rounds) &&
+            merged.stage3Rounds >= 1 &&
+            merged.stage3Rounds <= 20 &&
+            Number.isInteger(merged.stage1TeamsPerRound) &&
+            merged.stage1TeamsPerRound >= 2 &&
+            merged.stage1TeamsPerRound <= 12 &&
+            Number.isInteger(merged.stage1QualifiersPerRound ?? 1) &&
+            (merged.stage1QualifiersPerRound ?? 1) >= 1 &&
+            (merged.stage1QualifiersPerRound ?? 1) < merged.stage1TeamsPerRound &&
+            Number.isInteger(merged.stage2TeamsPerRound) &&
+            merged.stage2TeamsPerRound >= 2 &&
+            merged.stage2TeamsPerRound <= 12 &&
+            Number.isInteger(merged.stage3TeamsPerRound) &&
+            merged.stage3TeamsPerRound >= 2 &&
+            merged.stage3TeamsPerRound <= 12,
+          'Invalid round or team counts',
+        );
+        const structureChanged =
+          merged.stage1Rounds !== s.settings.stage1Rounds ||
+          merged.stage2Rounds !== s.settings.stage2Rounds ||
+          merged.stage3Rounds !== (s.settings.stage3Rounds ?? 1) ||
+          merged.stage1TeamsPerRound !== (s.settings.stage1TeamsPerRound ?? 4) ||
+          (merged.stage1QualifiersPerRound ?? 1) !== (s.settings.stage1QualifiersPerRound ?? 1) ||
+          merged.stage2TeamsPerRound !== (s.settings.stage2TeamsPerRound ?? 4) ||
+          merged.stage3TeamsPerRound !== (s.settings.stage3TeamsPerRound ?? 3);
+        if (structureChanged) {
+          merged.teamCount = merged.stage1Rounds * merged.stage1TeamsPerRound;
+          if (!('stage2Mapping' in p.settings)) {
+            merged.stage2Mapping = this.buildDefaultMapping(
+              merged.stage1Rounds,
+              merged.stage2Rounds,
+              merged.stage2TeamsPerRound,
+              merged.stage1QualifiersPerRound ?? 1,
+            );
+          }
+        }
+        this.require(
+          Number.isInteger(merged.teamCount) && merged.teamCount >= 2 && merged.teamCount <= 600,
+          'Invalid team count',
         );
         this.require(
           Number.isInteger(merged.jokerPosition) &&
@@ -1564,16 +1892,34 @@ export class Engine {
             ),
           'Invalid speed tiers',
         );
+        const flatMap = Array.isArray(merged.stage2Mapping) ? merged.stage2Mapping.flat() : [];
+        const roundsPerGroup = Math.max(
+          1,
+          Math.ceil(merged.stage2TeamsPerRound / (merged.stage1QualifiersPerRound ?? 1)),
+        );
+        const expectedTotalMapped = Math.min(
+          merged.stage1Rounds,
+          merged.stage2Rounds * roundsPerGroup,
+        );
         this.require(
-          merged.stage2Mapping.length === 3 &&
-            merged.stage2Mapping.every((group: number[]) => group.length === 4) &&
-            new Set(merged.stage2Mapping.flat()).size === 12 &&
-            merged.stage2Mapping
-              .flat()
-              .every((n: number) => Number.isInteger(n) && n >= 1 && n <= 12),
+          Array.isArray(merged.stage2Mapping) &&
+            merged.stage2Mapping.length === merged.stage2Rounds &&
+            merged.stage2Mapping.every(
+              (group: number[]) =>
+                Array.isArray(group) &&
+                group.length <= Math.max(merged.stage2TeamsPerRound, roundsPerGroup),
+            ) &&
+            flatMap.length === expectedTotalMapped &&
+            new Set(flatMap).size === flatMap.length &&
+            flatMap.every(
+              (n: number) => Number.isInteger(n) && n >= 1 && n <= merged.stage1Rounds,
+            ),
           'Invalid grouping',
         );
         s.settings = merged;
+        if (structureChanged) {
+          this.syncRoundsWithSettings(merged);
+        }
         break;
       }
       case 'questions.save': {
@@ -1625,6 +1971,14 @@ export class Engine {
           qs.every((q: Question | undefined) => q && q.stage === 1 && q.pool === 'main' && !q.used),
           'Invalid set',
         );
+        if (
+          qs.filter((q: Question) => q.difficulty === 'easy').length === 3 &&
+          qs.filter((q: Question) => q.difficulty === 'medium').length === 3 &&
+          qs.filter((q: Question) => q.difficulty === 'hard').length === 4 &&
+          qs.filter((q: Question) => q.difficulty === 'joker').length === 0
+        ) {
+          qs.filter((q: Question) => q.difficulty === 'hard').at(-1)!.difficulty = 'joker';
+        }
         for (const [d, n] of [
           ['easy', 3],
           ['medium', 3],
@@ -1732,11 +2086,7 @@ export class Engine {
     const currentQuestionOf = (teamId: number) =>
       s.tieQuestion ?? (this.round.stage === 1 ? s.set[s.progress[teamId] ?? 0] : s.set[s.index]);
     const stage2Categories = [
-      ...new Set(
-        this.questions()
-          .filter((x) => x.stage === 2 && x.pool === 'main')
-          .map((x) => x.category),
-      ),
+      ...new Set(this.stage2Pool().map((x) => x.category)),
     ];
     return {
       version: s.version,
@@ -1758,6 +2108,7 @@ export class Engine {
       index: s.index,
       settings: s.settings,
       winner: s.winner,
+      winners: s.winners,
       tieIds: s.tieIds,
       ready: s.ready,
       team:
@@ -1814,14 +2165,18 @@ export class Engine {
             eligible,
             current: q && q.status !== 'done' ? q : null,
           };
-        if (actor.role === 'display' && q && ['question', 'answer'].includes(q.status))
+        if (actor.role === 'display' && eligible && this.round.audience?.status === 'done')
           return {
-            count: prizes.length - 1,
-            current: {
-              body: q.body,
-              status: q.status,
-              ...(q.status === 'answer' ? { answer: q.answer } : {}),
-            },
+            count: prizes.filter((p) => p.status === 'done').length,
+            eligible: true,
+            current:
+              q && ['question', 'answer'].includes(q.status)
+                ? {
+                    body: q.body,
+                    status: q.status,
+                    ...(q.status === 'answer' ? { answer: q.answer } : {}),
+                  }
+                : null,
           };
         return null;
       })(),

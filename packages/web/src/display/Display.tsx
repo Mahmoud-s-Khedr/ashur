@@ -3,8 +3,8 @@ import { t, dir, lang } from '../lib/i18n';
 import type { Snapshot } from '../lib/types';
 import { usePrevious, useTeamEffects, type DisplayEvent } from '../lib/hooks';
 import { sfx } from '../lib/sfx';
-import { ToastStack, useToasts, Of } from '../ui/parts';
-import { Flame } from '../ui/icons';
+import { ToastStack, useToasts, Of, Confetti } from '../ui/parts';
+import { Check, Crown, Flame, Spark, Trophy } from '../ui/icons';
 import {
   BracketScene,
   Countdown,
@@ -142,6 +142,19 @@ export function Display({ s, remaining, now }: { s: Snapshot; remaining: number;
     if (readyCount > prevReady) sfx.play('ready');
   }, [checkedCount, readyCount]);
 
+  const prizeKey = s.prizeQuestion
+    ? `${s.prizeQuestion.count}:${s.prizeQuestion.current?.status ?? 'intro'}`
+    : '';
+  const prevPrizeKey = usePrevious(prizeKey);
+  useEffect(() => {
+    if (!prizeKey || prizeKey === prevPrizeKey) return;
+    const cur = s.prizeQuestion?.current?.status;
+    if (!prevPrizeKey) sfx.play('fanfare');
+    else if (cur === 'question') sfx.play('whoosh');
+    else if (cur === 'answer') sfx.play('correct');
+    else if ((s.prizeQuestion?.count ?? 0) >= 5) sfx.play('win');
+  }, [prizeKey]);
+
   const enableSound = () => {
     if (soundOn) {
       sfx.disable();
@@ -159,37 +172,110 @@ export function Display({ s, remaining, now }: { s: Snapshot; remaining: number;
   const sceneKey =
     s.scene !== 'auto'
       ? `scene-${s.scene}`
-      : ['WHEEL', 'CARD_PICK'].includes(phase)
-        ? `wheel-${s.roundKey}-${s.index}`
-        : s.stage === 3 && ['RUNNING', 'AUDIENCE', 'REVEAL'].includes(phase)
-          ? `ladder-${s.roundKey}`
-          : s.stage === 2 && ['AUDIENCE', 'REVEAL'].includes(phase)
-            ? `q-${s.roundKey}-${s.index}`
-            : s.stage === 1 && ['RUNNING', 'REVIEW'].includes(phase) && s.tieIds.length < 2
-              ? `race-${s.roundKey}`
-              : `${s.roundKey}-${phase}`;
-  if (s.prizeQuestion?.current && ['question', 'answer'].includes(s.prizeQuestion.current.status))
+      : s.prizeQuestion
+        ? `prize-segment`
+        : ['WHEEL', 'CARD_PICK'].includes(phase)
+          ? `wheel-${s.roundKey}-${s.index}`
+          : s.stage === 3 && ['RUNNING', 'AUDIENCE', 'REVEAL'].includes(phase)
+            ? `ladder-${s.roundKey}`
+            : s.stage === 2 && ['AUDIENCE', 'REVEAL'].includes(phase)
+              ? `q-${s.roundKey}-${s.index}`
+              : s.stage === 1 && ['RUNNING', 'REVIEW'].includes(phase) && s.tieIds.length < 2
+                ? `race-${s.roundKey}`
+                : `${s.roundKey}-${phase}`;
+  if (s.prizeQuestion) {
+    const pq = s.prizeQuestion;
+    const activeQ =
+      pq.current && ['question', 'answer'].includes(pq.current.status) ? pq.current : null;
+    const allDone = !activeQ && pq.count >= 5;
     scene = (
-      <section className="d-question">
-        <div className="q-block">
-          <div className="q-meta">
-            <span className="chip">
-              {lang === 'en'
-                ? `Prize question ${s.prizeQuestion.count + 1} of 5`
-                : `سؤال الجائزة ${s.prizeQuestion.count + 1} من ٥`}
+      <section className="d-prize" key={prizeKey}>
+        <div className="beams" aria-hidden="true" />
+        <Confetti
+          continuous={!activeQ || activeQ.status === 'answer'}
+          count={activeQ ? 110 : 160}
+          colors={['#ffc65a', '#27d6b0', '#ff7d9f', '#8f91ff', '#ffffff']}
+        />
+        <div className="prize-flyers" aria-hidden="true">
+          {Array.from({ length: 8 }, (_, i) => (
+            <span key={i} className={`flyer f${i + 1}`}>
+              {i % 2 === 0 ? <Spark /> : <Trophy />}
             </span>
-          </div>
-          <h1 className="q-body">{s.prizeQuestion.current.body}</h1>
-          {s.prizeQuestion.current.status === 'answer' && (
-            <div className="model-answer">
-              <small>{t.modelAnswer}</small>
-              <b>{s.prizeQuestion.current.answer}</b>
-            </div>
-          )}
+          ))}
         </div>
+        <header className="prize-top">
+          <span className="eyebrow">
+            {lang === 'en' ? 'Audience Prizes Segment' : 'فقرة جوائز الجمهور'}
+          </span>
+          <div className="prize-steps" aria-label="progress">
+            {[0, 1, 2, 3, 4].map((i) => {
+              const state =
+                i < pq.count ? 'done' : i === pq.count && !allDone ? 'now' : 'wait';
+              return (
+                <span key={i} className={`prize-step ${state}`}>
+                  {state === 'done' ? <Check /> : <b className="num">{i + 1}</b>}
+                </span>
+              );
+            })}
+          </div>
+        </header>
+        {activeQ ? (
+          <div className="q-block prize-q-block">
+            <div className="q-meta">
+              <span className="category-pill">
+                <Trophy />{' '}
+                {lang === 'en'
+                  ? `Prize Question ${pq.count + 1} of 5`
+                  : `سؤال الجائزة ${pq.count + 1} من ٥`}
+              </span>
+            </div>
+            <h1 className="q-body">{activeQ.body}</h1>
+            {activeQ.status === 'answer' && (
+              <div className="model-answer">
+                <small>{t.modelAnswer}</small>
+                <b>{activeQ.answer}</b>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="prize-hero">
+            <div className="prize-emblem">
+              <div className="emblem-crown">
+                <Crown />
+              </div>
+              <div className="emblem-core">
+                <Trophy />
+              </div>
+              <i className="halo" />
+              <i className="halo h2" />
+            </div>
+            <h1 className="prize-title">
+              {allDone
+                ? lang === 'en'
+                  ? 'Audience Prizes Complete!'
+                  : 'انتهت فقرة جوائز الجمهور!'
+                : lang === 'en'
+                  ? 'Audience Prizes'
+                  : 'فقرة جوائز الجمهور'}
+            </h1>
+            <p className="prize-sub">
+              {allDone
+                ? lang === 'en'
+                  ? 'Get ready for the Grand Final — Ashour Ladder!'
+                  : 'استعدوا الآن للمرحلة النهائية الحاسمة · سلم عاشور'
+                : pq.count === 0
+                  ? lang === 'en'
+                    ? 'Five random questions · Five instant prizes for the audience'
+                    : 'خمسة أسئلة عشوائية · خمس جوائز فورية للجمهور قبل النهائي'
+                  : lang === 'en'
+                    ? `Get ready for prize question ${pq.count + 1} of 5`
+                    : `استعدوا للسؤال رقم ${pq.count + 1} من ٥ في جوائز الجمهور`}
+            </p>
+          </div>
+        )}
       </section>
     );
-  else if (s.audienceQuestion && ['question', 'answer'].includes(s.audienceQuestion.status))
+  } else if (s.audienceQuestion && ['question', 'answer'].includes(s.audienceQuestion.status))
     scene = (
       <section className="d-question">
         <div className="q-block">
@@ -206,14 +292,14 @@ export function Display({ s, remaining, now }: { s: Snapshot; remaining: number;
         </div>
       </section>
     );
-  else if (s.scene === 'intro') scene = <Intro />;
+  else if (s.scene === 'intro') scene = <Intro s={s} />;
   else if (s.scene === 'bracket') scene = <BracketScene s={s} />;
   else if (s.scene === 'leaderboard')
     scene = <Leaderboard s={s} fx={fx} remaining={remaining} unit={unit} />;
   else {
     switch (phase) {
       case 'IDLE':
-        scene = anyDone ? <BracketScene s={s} /> : <Intro />;
+        scene = anyDone ? <BracketScene s={s} /> : <Intro s={s} />;
         break;
       case 'RULES':
         scene = <Rules s={s} />;
@@ -268,10 +354,13 @@ export function Display({ s, remaining, now }: { s: Snapshot; remaining: number;
         scene = s.stage === 3 ? <Champion s={s} fx={fx} /> : <RoundResults s={s} fx={fx} />;
         break;
       default:
-        scene = <Intro />;
+        scene = <Intro s={s} />;
     }
   }
-  const qualified = s.rounds.filter((r) => r.stage === 1 && r.completed).length;
+  const qualified = s.rounds
+    .filter((r) => r.stage === 1 && r.completed)
+    .reduce((sum, r) => sum + (r.winners?.length ?? (r.winner ? 1 : 0)), 0);
+  const totalToQualify = s.settings.stage1Rounds * (s.settings.stage1QualifiersPerRound ?? 1);
   return (
     <main
       className={`display-root ${idle ? 'idle' : ''} ${light ? 'light' : ''}`}
@@ -290,14 +379,20 @@ export function Display({ s, remaining, now }: { s: Snapshot; remaining: number;
           <span>{t.title}</span>
         </a>
         <div className="d-crumbs">
-          <span className="crumb stage">{stageName(s.stage)}</span>
-          {s.stage !== 3 && (
+          <span className="crumb stage">
+            {s.prizeQuestion
+              ? lang === 'en'
+                ? 'Audience Prizes'
+                : 'فقرة جوائز الجمهور'
+              : stageName(s.stage)}
+          </span>
+          {!s.prizeQuestion && s.stage !== 3 && (
             <span className="crumb">
               {s.stage === 2 ? t.groupLabel : t.round} <b className="num">{s.seq}</b>
             </span>
           )}
           <span className="crumb">
-            {t.qualifiedCount} <Of a={qualified} b={12} />
+            {t.qualifiedCount} <Of a={qualified} b={totalToQualify} />
           </span>
         </div>
         <div className="d-tools">

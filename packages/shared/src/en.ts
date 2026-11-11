@@ -84,7 +84,7 @@ export const en: Record<keyof typeof ar, string> = {
   winner: 'Winner',
   champion: 'Ashour Champion',
   results: 'Round results',
-  leadersTie: 'Tie for first place',
+  leadersTie: 'Tie',
   ladder: 'Ashour Ladder',
   enableSound: 'Enable sound',
   intro: 'Welcome to the Ashour Competition',
@@ -392,6 +392,10 @@ export const en: Record<keyof typeof ar, string> = {
   jumpStage: 'Quick jump to stage',
   lightTheme: 'Light theme',
   darkTheme: 'Dark theme',
+  tournamentStructure: 'Tournament structure (rounds & teams)',
+  roundsInStage: 'Number of rounds',
+  teamsPerRound: 'Teams per round',
+  qualifiersPerRound: 'Qualifiers per round',
 };
 
 export const phaseNamesEn: Record<string, string> = {

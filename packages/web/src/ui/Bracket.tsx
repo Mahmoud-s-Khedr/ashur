@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { t } from '../lib/i18n';
+import type { Settings } from '@ashour/shared';
 import type { PublicTeam, RoundView } from '../lib/types';
 import { Of, TeamMark, cssVars } from './parts';
 import { Trophy } from './icons';
@@ -14,6 +15,7 @@ export type SwapRef = { key: string; teamId: number };
  */
 export function Bracket({
   rounds,
+  settings,
   currentKey,
   onSelect,
   onSwap,
@@ -21,6 +23,7 @@ export function Bracket({
   compact = false,
 }: {
   rounds: RoundView[];
+  settings?: Settings;
   currentKey?: string;
   onSelect?: (key: string) => void;
   onSwap?: (a: SwapRef, b: SwapRef) => void;
@@ -31,7 +34,12 @@ export function Bracket({
   const [over, setOver] = useState<string>('');
   const stages = [1, 2, 3].map((n) => rounds.filter((r) => r.stage === n));
   const completed = stages[0].filter((r) => r.completed).length;
-  const slotsFor = (r: RoundView) => (r.stage === 3 ? 3 : 4);
+  const slotsFor = (r: RoundView) =>
+    r.stage === 1
+      ? (settings?.stage1TeamsPerRound ?? 4)
+      : r.stage === 2
+        ? (settings?.stage2TeamsPerRound ?? 4)
+        : (settings?.stage3TeamsPerRound ?? 3);
   return (
     <div className={`bracket ${compact ? 'compact' : ''}`}>
       {stages.map((list, si) => (
@@ -40,7 +48,13 @@ export function Bracket({
             <h2>
               <span>{stageName(si + 1)}</span>
               <small>
-                {si === 0 ? <Of a={completed} b={12} /> : si === 1 ? '12 → 3' : '3 → 🏆'}
+                {si === 0 ? (
+                  <Of a={completed} b={stages[0].length || 12} />
+                ) : si === 1 ? (
+                  `${(stages[0].length || 12) * (settings?.stage1QualifiersPerRound ?? 1)} → ${stages[1].length || 3}`
+                ) : (
+                  `${stages[1].length || 3} → 🏆`
+                )}
               </small>
             </h2>
             <div className="b-grid">
@@ -71,7 +85,9 @@ export function Bracket({
                       )}
                     </header>
                     {r.teams.map((team: PublicTeam) => {
-                      const won = r.winner === team.id;
+                      const won = r.winners?.length
+                        ? r.winners.includes(team.id)
+                        : r.winner === team.id;
                       const out = r.completed && !won;
                       return (
                         <div

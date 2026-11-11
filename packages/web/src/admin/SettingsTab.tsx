@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { t } from '../lib/i18n';
 import type { Settings } from '@ashour/shared';
 import type { Send, Snapshot } from '../lib/types';
-import { Section } from './common';
+import { Section, stageName } from './common';
 
 type Draft = Record<string, any>;
 
@@ -62,8 +62,43 @@ export function SettingsTab({ s, send }: { s: Snapshot; send: Send }) {
   useEffect(() => setJson(JSON.stringify(s.settings, null, 2)), [s.version]);
   const v = <K extends keyof Settings>(k: K): Settings[K] => (k in d ? d[k] : c[k]);
   const set = (k: string, val: unknown) => setD((x) => ({ ...x, [k]: val }));
+  const buildMapping = (
+    s1Rounds: number,
+    s2Rounds: number,
+    s2Teams: number,
+    s1Qualifiers = 1,
+  ) => {
+    const groups: number[][] = Array.from({ length: Math.max(1, s2Rounds) }, () => []);
+    const roundsPerGroup = Math.max(1, Math.ceil(Math.max(1, s2Teams) / Math.max(1, s1Qualifiers)));
+    let r = 1;
+    for (let g = 0; g < groups.length; g++) {
+      for (let k = 0; k < roundsPerGroup && r <= s1Rounds; k++, r++) {
+        groups[g].push(r);
+      }
+    }
+    return groups;
+  };
+  const setStructure = (k: string, val: number) => {
+    setD((prev) => {
+      const next = { ...prev, [k]: val };
+      const s1Rounds = 'stage1Rounds' in next ? next.stage1Rounds : c.stage1Rounds;
+      const s2Rounds = 'stage2Rounds' in next ? next.stage2Rounds : c.stage2Rounds;
+      const s1Teams =
+        'stage1TeamsPerRound' in next ? next.stage1TeamsPerRound : (c.stage1TeamsPerRound ?? 4);
+      const s1Quals =
+        'stage1QualifiersPerRound' in next
+          ? next.stage1QualifiersPerRound
+          : (c.stage1QualifiersPerRound ?? 1);
+      const s2Teams =
+        'stage2TeamsPerRound' in next ? next.stage2TeamsPerRound : (c.stage2TeamsPerRound ?? 4);
+      next.teamCount = s1Rounds * s1Teams;
+      next.stage2Mapping = buildMapping(s1Rounds, s2Rounds, s2Teams, s1Quals);
+      return next;
+    });
+  };
   const tiers = v('speedTiers');
   const mapping = v('stage2Mapping');
+  const s1RoundsVal = v('stage1Rounds');
   const dirty = Object.keys(d).length > 0;
   return (
     <>
@@ -72,6 +107,59 @@ export function SettingsTab({ s, send }: { s: Snapshot; send: Send }) {
       </div>
       <fieldset disabled={!editable} className="root-fieldset">
         <div className="settings-grid">
+          <Section title={t.tournamentStructure}>
+            <h3>{stageName(1)}</h3>
+            <div className="form-grid">
+              <Num
+                label={`${t.roundsInStage} (${stageName(1)})`}
+                min={1}
+                value={v('stage1Rounds')}
+                onChange={(x) => setStructure('stage1Rounds', x)}
+              />
+              <Num
+                label={`${t.teamsPerRound} (${stageName(1)})`}
+                min={2}
+                value={v('stage1TeamsPerRound') ?? 4}
+                onChange={(x) => setStructure('stage1TeamsPerRound', x)}
+              />
+              <Num
+                label={`${t.qualifiersPerRound} (${stageName(1)})`}
+                min={1}
+                value={v('stage1QualifiersPerRound') ?? 1}
+                onChange={(x) => setStructure('stage1QualifiersPerRound', x)}
+              />
+            </div>
+            <h3>{stageName(2)}</h3>
+            <div className="form-grid">
+              <Num
+                label={`${t.roundsInStage} (${stageName(2)})`}
+                min={1}
+                value={v('stage2Rounds')}
+                onChange={(x) => setStructure('stage2Rounds', x)}
+              />
+              <Num
+                label={`${t.teamsPerRound} (${stageName(2)})`}
+                min={2}
+                value={v('stage2TeamsPerRound') ?? 4}
+                onChange={(x) => setStructure('stage2TeamsPerRound', x)}
+              />
+            </div>
+            <h3>{stageName(3)}</h3>
+            <div className="form-grid">
+              <Num
+                label={`${t.roundsInStage} (${stageName(3)})`}
+                min={1}
+                value={v('stage3Rounds') ?? 1}
+                onChange={(x) => setStructure('stage3Rounds', x)}
+              />
+              <Num
+                label={`${t.teamsPerRound} (${stageName(3)})`}
+                min={2}
+                value={v('stage3TeamsPerRound') ?? 3}
+                onChange={(x) => setStructure('stage3TeamsPerRound', x)}
+              />
+            </div>
+          </Section>
           <Section title={t.timing}>
             <div className="form-grid">
               <Num
@@ -199,7 +287,7 @@ export function SettingsTab({ s, send }: { s: Snapshot; send: Send }) {
                         set('stage2Mapping', next);
                       }}
                     >
-                      {Array.from({ length: 12 }, (_, i) => i + 1).map((r) => (
+                      {Array.from({ length: s1RoundsVal }, (_, i) => i + 1).map((r) => (
                         <option key={r} value={r}>
                           {t.round} {r}
                         </option>
